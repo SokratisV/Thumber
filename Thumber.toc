@@ -1,0 +1,11 @@
+## Interface: 20505
+## Title: Thumber |cff66ccffThumbs|r
+## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
+## Author: Sokratis
+## Version: 1.0
+## SavedVariables: ThumberDB
+
+embeds.xml
+Thumber.lua
+Settings.lua
+Bindings.xml

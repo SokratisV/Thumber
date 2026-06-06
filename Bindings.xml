@@ -1,0 +1,14 @@
+<Bindings>
+	<Binding name="THUMBER_UP" header="THUMBER" default="UP">
+		Thumber_QuickMark("up")
+	</Binding>
+	<Binding name="THUMBER_DOWN" default="DOWN">
+		Thumber_QuickMark("down")
+	</Binding>
+	<Binding name="THUMBER_NEUTRAL" default="LEFT">
+		Thumber_QuickMark("neutral")
+	</Binding>
+	<Binding name="THUMBER_TOGGLE" default="RIGHT">
+		Thumber_Toggle()
+	</Binding>
+</Bindings>
