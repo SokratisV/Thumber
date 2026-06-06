@@ -3,6 +3,7 @@
 ## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
 ## Author: Sokratis
 ## Version: 1.0
+## X-License: MIT
 ## SavedVariables: ThumberDB
 # CurseForge: after creating the project, uncomment the next line with its numeric Project ID.
 # ## X-Curse-Project-ID: 000000

@@ -40,3 +40,7 @@ the mark (and, optionally, the note). Both can be toggled in settings:
 Everything is stored locally in `ThumberDB` (per account). Cross-realm
 players are keyed as `Name-Realm`; same-realm players by name. No data leaves
 your client.
+
+## License
+
+[MIT](LICENSE). The bundled libraries under `Libs/` keep their own licenses.
