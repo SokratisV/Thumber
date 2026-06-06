@@ -1,0 +1,47 @@
+name: Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # needed to create/update the GitHub Release
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from the .toc
+        id: toc
+        run: |
+          VERSION="$(grep -m1 '## Version:' Thumber.toc | sed -E 's/.*## Version:[[:space:]]*//' | tr -d '\r')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip=Thumber-$VERSION.zip" >> "$GITHUB_OUTPUT"
+          echo "Packaging Thumber $VERSION"
+
+      - name: Build addon zip
+        run: |
+          # --prefix puts everything under a top-level "Thumber/" folder so the
+          # zip extracts straight into Interface/AddOns. .gitattributes
+          # export-ignore keeps .github/.gitignore/.gitattributes out.
+          git archive --format=zip --prefix=Thumber/ -o "${{ steps.toc.outputs.zip }}" HEAD
+          echo "---- zip contents ----"
+          unzip -l "${{ steps.toc.outputs.zip }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Thumber-${{ steps.toc.outputs.version }}
+          path: ${{ steps.toc.outputs.zip }}
+
+      - name: Publish release (tag pushes only)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Thumber ${{ github.ref_name }}
+          files: ${{ steps.toc.outputs.zip }}
+          generate_release_notes: true
