@@ -28,10 +28,3 @@ jobs:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           # WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}   # uncomment when you add Wago
           # WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}   # uncomment when you add WoWInterface
-
-      - name: Upload build artifact   # downloadable zip for manual/dispatch runs too
-        uses: actions/upload-artifact@v4
-        with:
-          name: Thumber-package
-          path: .release/*.zip
-          if-no-files-found: ignore
