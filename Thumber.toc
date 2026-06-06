@@ -4,6 +4,8 @@
 ## Author: Sokratis
 ## Version: 1.0
 ## SavedVariables: ThumberDB
+# CurseForge: after creating the project, uncomment the next line with its numeric Project ID.
+# ## X-Curse-Project-ID: 000000
 
 embeds.xml
 Thumber.lua

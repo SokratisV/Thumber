@@ -1,4 +1,4 @@
-name: Package
+name: Package and release
 
 on:
   push:
@@ -7,41 +7,31 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write   # needed to create/update the GitHub Release
+  contents: write   # GITHUB_TOKEN needs this to create/update the Release
 
 jobs:
-  package:
+  release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the packager can build a changelog
 
-      - name: Read version from the .toc
-        id: toc
-        run: |
-          VERSION="$(grep -m1 '## Version:' Thumber.toc | sed -E 's/.*## Version:[[:space:]]*//' | tr -d '\r')"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "zip=Thumber-$VERSION.zip" >> "$GITHUB_OUTPUT"
-          echo "Packaging Thumber $VERSION"
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        env:
+          # Built in to every run — no setup needed. Publishes the GitHub Release.
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          # Add this secret + ## X-Curse-Project-ID in the .toc to enable CurseForge.
+          # Until both exist, the packager just skips the CurseForge upload.
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          # WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}   # uncomment when you add Wago
+          # WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}   # uncomment when you add WoWInterface
 
-      - name: Build addon zip
-        run: |
-          # --prefix puts everything under a top-level "Thumber/" folder so the
-          # zip extracts straight into Interface/AddOns. .gitattributes
-          # export-ignore keeps .github/.gitignore/.gitattributes out.
-          git archive --format=zip --prefix=Thumber/ -o "${{ steps.toc.outputs.zip }}" HEAD
-          echo "---- zip contents ----"
-          unzip -l "${{ steps.toc.outputs.zip }}"
-
-      - name: Upload build artifact
+      - name: Upload build artifact   # downloadable zip for manual/dispatch runs too
         uses: actions/upload-artifact@v4
         with:
-          name: Thumber-${{ steps.toc.outputs.version }}
-          path: ${{ steps.toc.outputs.zip }}
-
-      - name: Publish release (tag pushes only)
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Thumber ${{ github.ref_name }}
-          files: ${{ steps.toc.outputs.zip }}
-          generate_release_notes: true
+          name: Thumber-package
+          path: .release/*.zip
+          if-no-files-found: ignore
