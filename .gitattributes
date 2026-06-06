@@ -2,3 +2,5 @@
 /.github        export-ignore
 /.gitignore     export-ignore
 /.gitattributes export-ignore
+/.pkgmeta        export-ignore
+/thumbsup.png    export-ignore
