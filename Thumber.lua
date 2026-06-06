@@ -15,10 +15,9 @@ BINDING_NAME_THUMBER_TOGGLE = "Open the marks list  (default: Arrow Right)"
 ----------------------------------------------------------------------
 -- Constants
 ----------------------------------------------------------------------
--- Display order in the list (grouped by mark), and the look of each mark.
--- The ReadyCheck textures ship with every client and read cleanly as
--- up (green check) / neutral (yellow ?) / down (red cross).
-local MARK_ORDER = { "up", "neutral", "down" }
+-- The look of each mark, and its list sort order. The ReadyCheck textures ship
+-- with every client and read cleanly as up (green check) / neutral (yellow ?) /
+-- down (red cross).
 local MARK = {
 	up = {
 		label = "Thumbs Up",
@@ -39,16 +38,23 @@ local MARK = {
 		order = 3,
 	},
 }
+-- Precompute the per-mark colour hex and the size-0 icon escape once; these are
+-- constant and would otherwise be string.format'd on every row render and every
+-- tooltip refresh frame.
+for _, info in pairs(MARK) do
+	info.hex = ("%02x%02x%02x"):format(info.color[1] * 255, info.color[2] * 255, info.color[3] * 255)
+	info.icon0 = ("|T%s:0|t"):format(info.tex)
+end
+
 local function MarkIcon(mark, size)
 	local info = MARK[mark]
 	if not info then return "" end
-	size = size or 0
+	if not size or size == 0 then return info.icon0 end
 	return ("|T%s:%d|t"):format(info.tex, size)
 end
 local function MarkHex(mark)
-	local c = MARK[mark] and MARK[mark].color
-	if not c then return "ffffff" end
-	return ("%02x%02x%02x"):format(c[1] * 255, c[2] * 255, c[3] * 255)
+	local info = MARK[mark]
+	return info and info.hex or "ffffff"
 end
 
 local NOTE_PREVIEW = 40 -- chars of the note shown inline in a list row
@@ -145,7 +151,6 @@ end
 -- Window
 ----------------------------------------------------------------------
 local ROW_H, MAX_VIEW = 20, 220
-local HEADER_H = 40
 local win, rows
 
 local function SavePos(frame)
@@ -237,7 +242,6 @@ local function GetWindow()
 	----------------------------------------------------------------
 	-- Compose / edit area
 	----------------------------------------------------------------
-	f.editKey = nil
 	f.classHint = {}
 
 	local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
@@ -258,9 +262,11 @@ local function GetWindow()
 	end)
 	targetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-	-- Current mark of whoever is in the name box.
+	-- Current mark of whoever is in the name box. The name is trimmed and its
+	-- first letter capitalised so a typed "bob" matches the "Bob" that the Target
+	-- button and slash commands produce (WoW always capitalises player names).
 	local function CurrentEntry()
-		local key = nameBox:GetText():gsub("^%s+", ""):gsub("%s+$", "")
+		local key = nameBox:GetText():gsub("^%s+", ""):gsub("%s+$", ""):gsub("^%l", string.upper)
 		if key == "" then return nil end
 		return key, Marks()[key]
 	end
@@ -456,6 +462,9 @@ function RefreshList()
 	win.empty:SetShown(#list == 0)
 	win.empty2:SetShown(#list == 0)
 
+	-- Normalised key currently in the compose box, to highlight its row.
+	local curKey = win.nameBox:GetText():gsub("^%s+", ""):gsub("%s+$", ""):gsub("^%l", string.upper)
+
 	for i, item in ipairs(list) do
 		local e = item.entry
 		local r = GetRow(i)
@@ -471,7 +480,7 @@ function RefreshList()
 			text = text .. "  |cff909090" .. preview .. "|r"
 		end
 		r.text:SetText(text)
-		r.selbg:SetShown(item.key == (win.nameBox:GetText()))
+		r.selbg:SetShown(item.key == curKey)
 		r:Show()
 	end
 	for i = #list + 1, #rows do rows[i]:Hide() end
