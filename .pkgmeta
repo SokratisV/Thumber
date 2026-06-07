@@ -13,4 +13,3 @@ ignore:
   - .gitignore
   - .pkgmeta
   - thumbsup.png   # CurseForge project art — not needed inside the addon zip
-  - logo.png       # CurseForge project art — not needed inside the addon zip
