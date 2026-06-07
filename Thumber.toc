@@ -2,7 +2,7 @@
 ## Title: Thumber |cff66ccffThumbs|r
 ## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
 ## Author: Sokratis
-## Version: 1.0
+## Version: 1.1
 ## X-License: MIT
 ## SavedVariables: ThumberDB
 ## X-Curse-Project-ID: 1566935

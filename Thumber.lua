@@ -389,7 +389,7 @@ local function GetWindow()
 	empty:SetText("No marked players yet. Target someone and press the Target button,")
 	local empty2 = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	empty2:SetPoint("TOPLEFT", 18, -164)
-	empty2:SetText("or use /thumber up | down | neutral. Bind keys in Settings.")
+	empty2:SetText("or use /thumbsup | /thumbsdown | /neutral, or the arrow keys.")
 	f.empty, f.empty2 = empty, empty2
 
 	win, rows = f, {}
@@ -596,22 +596,8 @@ end
 local ApplyDefaultBindings -- defined in the keybind section below
 local function Print(msg) DEFAULT_CHAT_FRAME:AddMessage("|cff66ccffThumber|r: " .. msg) end
 
--- Resolve a name argument to a key. With no arg, use target/mouseover.
-local function ResolveTarget(arg)
-	if arg and arg ~= "" then
-		local name = arg:gsub("^%s+", ""):gsub("%s+$", "")
-		-- Normalise first letter so "bob" and "Bob" share one entry.
-		name = name:gsub("^%l", string.upper)
-		return name, name, nil
-	end
-	local key, name, class = KeyFromUnit("target")
-	if not key then key, name, class = KeyFromUnit("mouseover") end
-	return key, name, class
-end
-
 SLASH_THUMBER1 = "/thumber"
 SLASH_THUMBER2 = "/th"
-SLASH_THUMBER3 = "/pm"
 SlashCmdList.THUMBER = function(msg)
 	msg = msg or ""
 	local cmd, rest = msg:match("^(%S*)%s*(.-)$")
@@ -619,14 +605,9 @@ SlashCmdList.THUMBER = function(msg)
 
 	if cmd == "" or cmd == "show" or cmd == "list" then
 		Thumber_Toggle()
-	elseif cmd == "up" or cmd == "good" or cmd == "+" then
-		Thumber_QuickMarkArg("up", rest)
-	elseif cmd == "down" or cmd == "bad" or cmd == "-" then
-		Thumber_QuickMarkArg("down", rest)
-	elseif cmd == "neutral" or cmd == "meh" then
-		Thumber_QuickMarkArg("neutral", rest)
 	elseif cmd == "note" then
-		local key, name, class = ResolveTarget(nil)
+		local key, name, class = KeyFromUnit("target")
+		if not key then key, name, class = KeyFromUnit("mouseover") end
 		if not key then Print("note who? target a player, then /thumber note <text>."); return end
 		if class then SetMark(key, name, (Marks()[key] and Marks()[key].mark) or "neutral", class) end
 		SetNote(key, rest)
@@ -643,26 +624,12 @@ SlashCmdList.THUMBER = function(msg)
 		end
 	else
 		Print("commands:")
-		Print("  /thumber (/th, /pm) — open the marks list")
-		Print("  /thumber up | down | neutral [name] — mark target (or named player)")
+		Print("  /thumbsup (/tu) | /thumbsdown (/td) | /neutral (/nt) [note] — mark your target")
+		Print("  /thumber (/th) — open the marks list")
 		Print("  /thumber note <text> — set a note on your target")
 		Print("  /thumber config — settings & keybinds")
-		Print("  /thumbsup (/tu) | /thumbsdown (/td) | /neutral (/nt) [note] — mark target")
-		Print("  /tu config — open settings")
 		Print("  /thumber resetbinds — re-apply the arrow-key defaults")
 	end
-end
-
--- Slash variant of QuickMark that accepts an optional name argument.
-function Thumber_QuickMarkArg(mark, arg)
-	local key, name, class = ResolveTarget(arg)
-	if not key then
-		Print("target a player first, or pass a name: /thumber " .. mark .. " <name>.")
-		return
-	end
-	SetMark(key, name, mark, class)
-	local info = MARK[mark] or MARK.neutral
-	Print(MarkIcon(mark) .. " " .. name .. " marked |cff" .. MarkHex(mark) .. info.label .. "|r.")
 end
 
 -- Dedicated /thumbsup /thumbsdown /neutral commands (+ /tu /td aliases). These

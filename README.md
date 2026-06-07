@@ -12,15 +12,13 @@ sortable list window.
   neutral, **Arrow Right** = open the list. These are claimed once on first run
   (overriding the arrow-key movement defaults); rebind or clear them any time in
   `/thumber config` or under **Esc → Key Bindings → Thumber**.
-- **Slash commands** (`/thumber`, also `/th` and `/pm`):
-  - `/thumber` — open the marks list.
-  - `/thumber up | down | neutral [name]` — mark your target, or a named player.
-  - `/thumber note <text>` — set a note on your target.
-  - `/thumber config` — settings & keybinds.
+- **Slash commands:**
   - `/thumbsup` (`/tu`), `/thumbsdown` (`/td`), `/neutral` (`/nt`) `[note]` —
     mark your **target** (or mouseover) and, if you pass text, set its note in one
     go. Quotes are optional: `/tu ninja looter` and `/tu "ninja looter"` both work.
-  - `/tu config` — open settings (also `/td config`, `/neutral config`).
+  - `/thumber` (`/th`) — open the marks list.
+  - `/thumber note <text>` — set a note on your target.
+  - `/thumber config` — settings & keybinds.
 - **In the window:** click **Target** to load your current target, then click a
   thumbs button. Type a note and press Enter. Click any row to edit it; the
   **Remove** button (or the red X on a row) deletes a mark.
