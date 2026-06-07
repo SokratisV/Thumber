@@ -12,6 +12,10 @@ sortable list window.
   neutral, **Arrow Right** = open the list. These are claimed once on first run
   (overriding the arrow-key movement defaults); rebind or clear them any time in
   `/thumber config` or under **Esc → Key Bindings → Thumber**.
+  - **Toggle:** marking a player with the mark they already have **removes**
+    them (and tells you). A *different* mark just changes it. This applies to
+    the keybinds and the `/thumbsup` / `/thumbsdown` / `/neutral` commands; note
+    that passing a note (e.g. `/tu great tank`) updates instead of removing.
 - **Slash commands:**
   - `/thumbsup` (`/tu`), `/thumbsdown` (`/td`), `/neutral` (`/nt`) `[note]` —
     mark your **target** (or mouseover) and, if you pass text, set its note in one

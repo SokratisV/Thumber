@@ -132,6 +132,20 @@ local function RemoveMark(key)
 	Refresh()
 end
 
+-- Quick-action helper: if the player already has exactly `mark`, remove them
+-- (toggle off); otherwise set/change it. Returns "removed", "set", or "changed".
+local function ToggleMark(key, name, mark, class)
+	if not key or key == "" then return end
+	local e = Marks()[key]
+	if e and e.mark == mark then
+		RemoveMark(key)
+		return "removed"
+	end
+	local existed = e ~= nil
+	SetMark(key, name, mark, class)
+	return existed and "changed" or "set"
+end
+
 -- Sorted snapshot of all marks: grouped by mark (up, neutral, down) then name.
 local function SortedMarks()
 	local list = {}
@@ -535,10 +549,14 @@ function Thumber_QuickMark(mark)
 		UIErrorsFrame:AddMessage("Thumber: no player targeted.", 1, 0.4, 0.4)
 		return
 	end
-	SetMark(key, name, mark, class)
 	local info = MARK[mark] or MARK.neutral
-	DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
-		" marked |cff" .. MarkHex(mark) .. info.label .. "|r.")
+	if ToggleMark(key, name, mark, class) == "removed" then
+		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
+			" un-marked (was |cff" .. MarkHex(mark) .. info.label .. "|r).")
+	else
+		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
+			" marked |cff" .. MarkHex(mark) .. info.label .. "|r.")
+	end
 end
 
 ----------------------------------------------------------------------
@@ -651,11 +669,20 @@ local function MarkTargetWithNote(mark, msg)
 			(mark == "up" and "tu" or mark == "down" and "td" or "neutral") .. " [note].")
 		return
 	end
-	SetMark(key, name, mark, class)
-	if arg ~= "" then SetNote(key, arg) end
 	local info = MARK[mark] or MARK.neutral
-	Print(MarkIcon(mark) .. " " .. name .. " marked |cff" .. MarkHex(mark) .. info.label .. "|r" ..
-		(arg ~= "" and (" — \"" .. arg .. "\"") or "") .. ".")
+	-- With no note, pressing the mark a player already has toggles it off.
+	if arg == "" then
+		if ToggleMark(key, name, mark, class) == "removed" then
+			Print(MarkIcon(mark) .. " " .. name .. " un-marked (was |cff" .. MarkHex(mark) .. info.label .. "|r).")
+		else
+			Print(MarkIcon(mark) .. " " .. name .. " marked |cff" .. MarkHex(mark) .. info.label .. "|r.")
+		end
+		return
+	end
+	-- A supplied note always sets/updates (never removes).
+	SetMark(key, name, mark, class)
+	SetNote(key, arg)
+	Print(MarkIcon(mark) .. " " .. name .. " marked |cff" .. MarkHex(mark) .. info.label .. "|r — \"" .. arg .. "\".")
 end
 
 SLASH_THUMBERUP1 = "/thumbsup"
