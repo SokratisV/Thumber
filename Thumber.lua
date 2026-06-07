@@ -406,6 +406,9 @@ local function GetWindow()
 	empty2:SetText("or use /thumbsup | /thumbsdown | /neutral, or the arrow keys.")
 	f.empty, f.empty2 = empty, empty2
 
+	-- CreateFrame frames are shown by default; start hidden so the first toggle
+	-- opens the window instead of hiding the freshly-created (already-shown) one.
+	f:Hide()
 	win, rows = f, {}
 	return f
 end
