@@ -1,5 +1,5 @@
 ## Interface: 20505
-## Title: Thumber |cff66ccffThumbs|r
+## Title: Thumber
 ## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
 ## Author: Sokratis
 ## Version: 1.1.1
