@@ -1,9 +1,15 @@
 # Thumber
 
-Track your interactions with other players in World of Warcraft (TBC Classic /
-Anniversary). Mark anyone **thumbs up**, **neutral**, or **thumbs down**, with
+Track your interactions with other players in World of Warcraft (WoW Forever /
+TBC Classic). Mark anyone **thumbs up**, **neutral**, or **thumbs down**, with
 an optional free-text note. Your mark shows up in their unit tooltip and in a
 sortable list window.
+
+> **Client support.** Runs on **WoW Forever** (interface `16001`) and on the
+> **TBC Classic / Anniversary** client (interface `20505`) from the same files.
+> Forever serves Classic content from the Midnight 12.x client, so it reports a
+> Classic project id but only exposes the modern namespaced API — every call that
+> moved is feature-detected rather than switched on project id.
 
 ## Marking players
 

@@ -1,8 +1,8 @@
-## Interface: 20505
+## Interface: 16001, 20505
 ## Title: Thumber
 ## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
 ## Author: Sokratis
-## Version: 1.1.1
+## Version: 1.2.0
 ## X-License: MIT
 ## SavedVariables: ThumberDB
 ## X-Curse-Project-ID: 1566935

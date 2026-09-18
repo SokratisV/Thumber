@@ -1,7 +1,8 @@
 -- Thumber — mark other players thumbs up / neutral / thumbs down, with an
 -- optional note. Marks surface in unit tooltips and in a sortable list window.
 --
--- TBC Classic / Anniversary (Interface 20505). Self-contained: no library deps.
+-- WoW Forever (Interface 16001, Midnight 12.x API) and TBC Classic / Anniversary
+-- (Interface 20505). Self-contained apart from the embedded LibDBIcon stack.
 
 local ADDON = ...
 
@@ -527,8 +528,13 @@ end
 ----------------------------------------------------------------------
 -- Tooltip integration
 ----------------------------------------------------------------------
-local function OnTooltipUnit(self)
+-- `resize` is only wanted on the legacy OnTooltipSetUnit path, where the line is
+-- appended after the tooltip has already sized itself. The tooltip data API lays
+-- the tooltip out again after every post-call, and calling Show() from inside one
+-- can re-enter the processor, so we skip it there.
+local function OnTooltipUnit(self, resize)
 	if DB().showInTooltip == false then return end
+	if self.IsForbidden and self:IsForbidden() then return end
 	local _, unit = self:GetUnit()
 	local key = KeyFromUnit(unit)
 	local e = key and Marks()[key]
@@ -538,9 +544,21 @@ local function OnTooltipUnit(self)
 	if e.note and e.note ~= "" and DB().showNoteInTooltip ~= false then
 		self:AddLine("\"" .. e.note .. "\"", 0.85, 0.85, 0.85, true)
 	end
-	self:Show() -- recompute size after adding lines
+	if resize then self:Show() end
 end
-GameTooltip:HookScript("OnTooltipSetUnit", OnTooltipUnit)
+
+-- WoW Forever / Midnight (12.x) build tooltips through TooltipDataProcessor, and
+-- OnTooltipSetUnit never fires there. Keep the script hook for the older Classic
+-- clients that predate the tooltip data API.
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and C_TooltipInfo then
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip)
+		if tooltip == GameTooltip or tooltip == GameTooltipTooltip then
+			OnTooltipUnit(tooltip, false)
+		end
+	end)
+else
+	GameTooltip:HookScript("OnTooltipSetUnit", function(self) OnTooltipUnit(self, true) end)
+end
 
 ----------------------------------------------------------------------
 -- Keybind / quick-mark
