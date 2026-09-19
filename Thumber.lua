@@ -60,6 +60,13 @@ end
 
 local NOTE_PREVIEW = 40 -- chars of the note shown inline in a list row
 
+-- Midnight can hand addon-tainted code opaque "secret" values. A secret still
+-- reports its underlying type, so testing for one has to come before any compare.
+local issecret = _G.issecretvalue
+local function IsSecret(v)
+	return issecret ~= nil and issecret(v)
+end
+
 ----------------------------------------------------------------------
 -- Saved-variables helpers
 ----------------------------------------------------------------------
@@ -313,9 +320,18 @@ local function GetWindow()
 	-- how an NPC gets in: target a wolf, type its name, mark it. So check the units
 	-- we *can* resolve and refuse a known non-player.
 	local function IsKnownNonPlayer(name)
+		-- A cross-realm key is "Name-Realm" while UnitName gives the bare name, so
+		-- compare on the display form or the check silently never matches.
+		local bare = DisplayName(name)
 		for _, unit in ipairs({ "target", "mouseover", "focus", name }) do
-			if UnitExists(unit) and UnitName(unit) == name then
-				return UnitIsPlayer(unit) ~= true
+			if UnitExists(unit) and UnitName(unit) == bare then
+				-- Only a real "no" refuses. If the client won't say whether this is a
+				-- player -- a secret, or anything that isn't a plain boolean -- allow
+				-- the mark. Refusing on an unreadable answer would block legitimate
+				-- players, and "unknown" is not "no" anywhere else in this addon.
+				local isPlayer = UnitIsPlayer(unit)
+				if IsSecret(isPlayer) or type(isPlayer) ~= "boolean" then return false end
+				return isPlayer == false
 			end
 		end
 		return false   -- nobody we can see by that name; can't say, so allow it
