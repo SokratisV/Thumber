@@ -307,10 +307,28 @@ local function GetWindow()
 	end
 	f.LoadEntry = LoadEntry
 
+	-- The Target button and the keybinds all go through KeyFromUnit, which refuses
+	-- anything that isn't a player. A name typed into the box has no unit behind it
+	-- to check -- unless it happens to name something we can see right now, which is
+	-- how an NPC gets in: target a wolf, type its name, mark it. So check the units
+	-- we *can* resolve and refuse a known non-player.
+	local function IsKnownNonPlayer(name)
+		for _, unit in ipairs({ "target", "mouseover", "focus", name }) do
+			if UnitExists(unit) and UnitName(unit) == name then
+				return UnitIsPlayer(unit) ~= true
+			end
+		end
+		return false   -- nobody we can see by that name; can't say, so allow it
+	end
+
 	local function ApplyMark(mark)
 		local key = CurrentEntry()
 		if not key then
 			UIErrorsFrame:AddMessage("Thumber: type a name or click Target first.", 1, 0.4, 0.4)
+			return
+		end
+		if IsKnownNonPlayer(key) then
+			UIErrorsFrame:AddMessage("Thumber: " .. key .. " isn't a player.", 1, 0.4, 0.4)
 			return
 		end
 		local name = DisplayName(key)
@@ -511,6 +529,9 @@ end
 -- Public window controls
 ----------------------------------------------------------------------
 function Thumber_Toggle()
+	-- Bound to Arrow Right by default, so it would fire while that key is being
+	-- captured in the settings panel. See Thumber_CapturingKey.
+	if Thumber_CapturingKey then return end
 	local f = GetWindow()
 	if f:IsShown() then
 		f:Hide()
@@ -563,7 +584,14 @@ end
 ----------------------------------------------------------------------
 -- Keybind / quick-mark
 ----------------------------------------------------------------------
+-- True while a key-capture row in the settings panel is waiting for a keypress.
+-- SetPropagateKeyboardInput(false) is supposed to stop the pressed key reaching
+-- its binding, but it evidently doesn't here, so the actions check this instead:
+-- pressing Arrow Up to bind it should not also mark your target.
+Thumber_CapturingKey = false
+
 function Thumber_QuickMark(mark)
+	if Thumber_CapturingKey then return end
 	local key, name, class = KeyFromUnit("target")
 	if not key then key, name, class = KeyFromUnit("mouseover") end
 	if not key then

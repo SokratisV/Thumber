@@ -3,6 +3,7 @@ local ADDON = ...
 local panel = CreateFrame("Frame")
 panel.name = "Thumber"
 local category -- new Settings API category, when available
+local refreshers = {}   -- run on every panel show, to resync widgets with the game state
 
 local function db()
 	ThumberDB = ThumberDB or {}
@@ -19,6 +20,7 @@ local function AddCheck(label, get, set, x, y)
 	fs:SetPoint("LEFT", cb, "RIGHT", 4, 0)
 	fs:SetText(label)
 	cb:SetScript("OnShow", function(self) self:SetChecked(get() and true or false) end)
+	refreshers[#refreshers + 1] = function() cb:SetChecked(get() and true or false) end
 	cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
 	return cb
 end
@@ -38,19 +40,23 @@ local function AddBindRow(bindingName, label, x, y)
 		local k = GetBindingKey(bindingName)
 		btn:SetText(k and ("|cff00ff00" .. k .. "|r") or "Click to set key")
 	end
+	-- Also driven from the panel itself: a child's OnShow is not a reliable moment
+	-- to resync inside a Settings canvas category, which is why these rows came up
+	-- reading "Click to set key" for keys that were in fact bound.
+	refreshers[#refreshers + 1] = refresh
 
 	local function clear()
 		local o1, o2 = GetBindingKey(bindingName)
 		if o1 then SetBinding(o1) end
 		if o2 then SetBinding(o2) end
 		Thumber_SaveBindings()
-		btn.listening = false; btn:EnableKeyboard(false)
+		btn.listening = false; Thumber_CapturingKey = false; btn:EnableKeyboard(false)
 		refresh()
 	end
 
 	btn:SetScript("OnShow", refresh)
 	btn:SetScript("OnHide", function(self)
-		self.listening = false
+		self.listening = false; Thumber_CapturingKey = false
 		self:EnableKeyboard(false)
 		-- Make sure we never leave the keyboard "consumed" if the panel is closed
 		-- mid-capture. SetPropagateKeyboardInput is protected in combat — skip then.
@@ -68,7 +74,7 @@ local function AddBindRow(bindingName, label, x, y)
 		-- SetPropagateKeyboardInput is protected and blocked in combat lockdown;
 		-- don't start key capture there (it would throw ADDON_ACTION_BLOCKED).
 		if InCombatLockdown() then return end
-		self.listening = true
+		self.listening = true; Thumber_CapturingKey = true
 		self:SetText("Press a key… (Esc cancels)")
 		self:EnableKeyboard(true)
 		self:SetPropagateKeyboardInput(false) -- consume keys only while capturing
@@ -81,7 +87,7 @@ local function AddBindRow(bindingName, label, x, y)
 			return
 		end
 		if key == "ESCAPE" then
-			self.listening = false
+			self.listening = false; Thumber_CapturingKey = false
 			self:EnableKeyboard(false)
 			if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
 			refresh()
@@ -103,7 +109,7 @@ local function AddBindRow(bindingName, label, x, y)
 		if o1 then SetBinding(o1) end
 		if o2 then SetBinding(o2) end
 		if SetBinding(combo, bindingName) then Thumber_SaveBindings() end
-		self.listening = false
+		self.listening = false; Thumber_CapturingKey = false
 		self:EnableKeyboard(false)
 		if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
 		refresh()
@@ -155,6 +161,16 @@ note:SetText("Bind: left-click a slot then press a key. Right-click a slot to cl
 local note2 = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 note2:SetPoint("TOPLEFT", 18, -316)
 note2:SetText("These also appear under Esc > Key Bindings > Thumber.")
+
+local function refreshPanel()
+	for _, fn in ipairs(refreshers) do fn() end
+end
+panel:SetScript("OnShow", refreshPanel)
+-- The modern Settings frame drives canvas panels through these rather than a
+-- child's OnShow, which is why the bound keys weren't showing.
+panel.OnRefresh = refreshPanel
+panel.OnCommit  = function() end
+panel.OnDefault = function() end
 
 ----------------------------------------------------------------------
 -- Register + open helper (supports both the new and legacy options APIs)
