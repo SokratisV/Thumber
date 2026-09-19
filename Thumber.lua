@@ -734,6 +734,16 @@ local DEFAULT_BINDS = {
 	{ "LEFT", "THUMBER_NEUTRAL" },
 	{ "RIGHT", "THUMBER_TOGGLE" },
 }
+-- SaveBindings takes 1 (account) or 2 (character) and raises on anything else.
+-- At PLAYER_LOGIN the binding set isn't resolved yet on every client -- Forever
+-- answers nil there -- so this reports whether the save actually happened, and
+-- callers retry on UPDATE_BINDINGS rather than losing the binding.
+function Thumber_SaveBindings()
+	local set = GetCurrentBindingSet and GetCurrentBindingSet()
+	if type(set) ~= "number" or set < 1 or set > 2 then return false end
+	return (pcall(SaveBindings, set))
+end
+
 ApplyDefaultBindings = function(force)
 	local db = DB()
 	if db.bindDefaultsV2 and not force then return true, 0 end
@@ -745,7 +755,9 @@ ApplyDefaultBindings = function(force)
 			if SetBinding(key, action) then count = count + 1 end
 		end
 	end
-	if count > 0 then SaveBindings(GetCurrentBindingSet()) end
+	-- Persist before marking it done. A binding we set but couldn't save is gone
+	-- after the next logout, and the saved flag would stop us ever re-applying it.
+	if not Thumber_SaveBindings() then return false end
 	db.bindDefaultsV2 = true
 	return true, count
 end
@@ -758,10 +770,14 @@ init:RegisterEvent("PLAYER_LOGIN")
 init:SetScript("OnEvent", function(self, event)
 	DB() -- ensure table
 	Thumber_UpdateMinimapButton()
-	if not ApplyDefaultBindings() then
-		-- Deferred because we logged in mid-combat; retry once combat ends.
-		self:RegisterEvent("PLAYER_REGEN_ENABLED")
-	elseif event == "PLAYER_REGEN_ENABLED" then
+	if ApplyDefaultBindings() then
 		self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+		self:UnregisterEvent("UPDATE_BINDINGS")
+	else
+		-- Either we logged in mid-combat (SetBinding is unsafe there) or the
+		-- binding set wasn't resolved yet. Both resolve themselves shortly, so
+		-- wait for whichever announces it.
+		self:RegisterEvent("PLAYER_REGEN_ENABLED")
+		self:RegisterEvent("UPDATE_BINDINGS")
 	end
 end)
