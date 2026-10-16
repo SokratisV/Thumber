@@ -60,6 +60,11 @@ end
 
 local NOTE_PREVIEW = 40 -- chars of the note shown inline in a list row
 
+-- The window borrows FlareUI's look: Blizzard's own tooltip border and
+-- Collections tile, tinted bronze, under a black wash.
+local BRONZE       = { 0.80, 0.60, 0.34 }
+local BRONZE_MUTED = { 0.61, 0.48, 0.29 }
+
 -- Midnight can hand addon-tainted code opaque "secret" values. A secret still
 -- reports its underlying type, so testing for one has to come before any compare.
 local issecret = _G.issecretvalue
@@ -80,15 +85,82 @@ local function Marks()
 	return d.marks
 end
 
--- Build a stable key from a unit. Cross-realm players get a "Name-Realm" key;
--- same-realm players are keyed by bare name. Returns key, displayName, class.
+-- WoW Forever gives every character a first name and a surname, unique across
+-- the region, and UnitName answers (first name, surname) where Classic answers
+-- (name, realm). So there the second value is a surname to keep, not a realm to
+-- append. Detected by feature, never by client flavour.
+local function UniqueNames()
+	return RegionalUniqueNamesEnabled ~= nil and RegionalUniqueNamesEnabled() == true
+end
+
+local function SurnameSeparator()
+	local consts = Constants and Constants.CharacterNameSeparatorConsts
+	return consts and consts.CHARACTERNAME_SURNAME_SEPARATOR or " "
+end
+
+-- A unit's full name as the key form: "First Surname" on Forever, "Name-Realm"
+-- for a cross-realm player elsewhere, the bare name otherwise. Returns the key
+-- and the first name, or nothing if it can't be read (a secret, or no unit).
+local function UnitKey(unit)
+	-- The player's own surname only comes back from the unmodified name.
+	local getName = (unit == "player" and UnitNameUnmodified) or UnitName
+	local name, second = getName(unit)
+	if not name or IsSecret(name) or name == "" then return end
+	if second and IsSecret(second) then return end
+	local hasSecond = second and second ~= ""
+	if UniqueNames() then
+		local sep = SurnameSeparator()
+		if hasSecond and not name:find(sep, 1, true) then return name .. sep .. second, name end
+		return name, name
+	end
+	return hasSecond and (name .. "-" .. second) or name, name
+end
+
+-- Build a stable key from a unit. Returns key, displayName, class. On Forever
+-- the display name keeps the surname ("First Surname"); elsewhere it is the bare
+-- name and the realm lives only in the key.
 local function KeyFromUnit(unit)
 	if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return end
-	local name, realm = UnitName(unit)
-	if not name or name == "" then return end
-	local key = (realm and realm ~= "") and (name .. "-" .. realm) or name
+	local key, name = UnitKey(unit)
+	if not key then return end
 	local _, class = UnitClass(unit)
-	return key, name, class
+	return key, UniqueNames() and key or name, class
+end
+
+-- Capitalise the first letter of a typed name (WoW always does) and, on Forever,
+-- of the surname after it. The old "First-Surname" spelling is accepted too.
+local function NormalizeKey(text)
+	local key = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	if UniqueNames() then
+		local sep = SurnameSeparator()
+		key = key:gsub("^([^%-%s]+)%-([^%-%s]+)$", "%1" .. sep:gsub("%%", "%%%%") .. "%2")
+		local first, rest = key:find(sep, 1, true)
+		if first then
+			local surname = key:sub(rest + 1):gsub("^%l", string.upper)
+			key = key:sub(1, rest) .. surname
+		end
+	end
+	return (key:gsub("^%l", string.upper))
+end
+
+-- Before Thumber understood surnames, a Forever mark was saved as "First-Surname"
+-- with only the first name to show. Re-key those as "First Surname". Only ever
+-- touches keys that look like exactly that, and never overwrites an existing mark.
+local function MigrateSurnameKeys()
+	if not UniqueNames() then return end
+	local marks = Marks()
+	local sep, moving = SurnameSeparator(), {}
+	for key in pairs(marks) do
+		local first, surname = key:match("^([^%-%s]+)%-([^%-%s]+)$")
+		if first and not marks[first .. sep .. surname] then
+			moving[#moving + 1] = { key, first .. sep .. surname }
+		end
+	end
+	for _, m in ipairs(moving) do
+		local entry = marks[m[1]]
+		entry.name = m[2]
+		marks[m[2]], marks[m[1]] = entry, nil
+	end
 end
 
 -- Display name for a key (strip the "-Realm" suffix for the local realm look).
@@ -242,24 +314,43 @@ local function GetWindow()
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", f.StartMoving)
 	f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing(); SavePos(self) end)
-	f:SetScript("OnHide", function(self) SavePos(self) end)
+	f:SetScript("OnHide", function(self)
+		SavePos(self)
+		if SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE) end
+	end)
 	f:SetClampedToScreen(true)
 	tinsert(UISpecialFrames, "ThumberFrame") -- closes on Escape
-	f:SetBackdrop({
-		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-		tile = true, tileSize = 32, edgeSize = 32,
-		insets = { left = 8, right = 8, top = 8, bottom = 8 },
-	})
+	f:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16 })
+	f:SetBackdropBorderColor(BRONZE[1], BRONZE[2], BRONZE[3], 1)
+	-- Blizzard's Collections tile under a black wash, inside the border.
+	local art = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+	art:SetPoint("TOPLEFT", 5, -5)
+	art:SetPoint("BOTTOMRIGHT", -5, 5)
+	art:SetTexture("Interface\\Collections\\CollectionsBackgroundTile", "REPEAT", "REPEAT")
+	art:SetHorizTile(true)
+	art:SetVertTile(true)
+	local wash = f:CreateTexture(nil, "BACKGROUND", nil, 2)
+	wash:SetAllPoints(art)
+	wash:SetColorTexture(0, 0, 0, 0.5)
+	f:SetScript("OnShow", function()
+		if SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_OPEN then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN) end
+	end)
 
-	local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	title:SetPoint("TOPLEFT", 14, -12)
+	local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 16, -12)
 	title:SetText("Thumber")
 
 	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-	close:SetPoint("TOPRIGHT", 2, 2)
+	close:SetPoint("TOPRIGHT", -4, -4)
 	HeaderIcon(f, "Interface\\Buttons\\UI-OptionsButton", "Settings",
-		function() if Thumber_OpenSettings then Thumber_OpenSettings() end end, -34)
+		function() if Thumber_OpenSettings then Thumber_OpenSettings() end end, -38)
+
+	-- Bronze rule under the header, as in FlareUI's windows.
+	local headerLine = f:CreateTexture(nil, "ARTWORK")
+	headerLine:SetColorTexture(BRONZE_MUTED[1], BRONZE_MUTED[2], BRONZE_MUTED[3], 0.6)
+	headerLine:SetHeight(1)
+	headerLine:SetPoint("TOPLEFT", 6, -34)
+	headerLine:SetPoint("TOPRIGHT", -6, -34)
 
 	----------------------------------------------------------------
 	-- Compose / edit area
@@ -288,7 +379,7 @@ local function GetWindow()
 	-- first letter capitalised so a typed "bob" matches the "Bob" that the Target
 	-- button and slash commands produce (WoW always capitalises player names).
 	local function CurrentEntry()
-		local key = nameBox:GetText():gsub("^%s+", ""):gsub("%s+$", ""):gsub("^%l", string.upper)
+		local key = NormalizeKey(nameBox:GetText())
 		if key == "" then return nil end
 		return key, Marks()[key]
 	end
@@ -321,10 +412,13 @@ local function GetWindow()
 	-- we *can* resolve and refuse a known non-player.
 	local function IsKnownNonPlayer(name)
 		-- A cross-realm key is "Name-Realm" while UnitName gives the bare name, so
-		-- compare on the display form or the check silently never matches.
-		local bare = DisplayName(name)
+		-- compare on the display form or the check silently never matches. On
+		-- Forever the key is the full "First Surname", which is what UnitKey builds.
+		local bare = UniqueNames() and name or DisplayName(name)
 		for _, unit in ipairs({ "target", "mouseover", "focus", name }) do
-			if UnitExists(unit) and UnitName(unit) == bare then
+			local key, first
+			if UnitExists(unit) then key, first = UnitKey(unit) end
+			if key and (UniqueNames() and key or first) == bare then
 				-- Only a real "no" refuses. If the client won't say whether this is a
 				-- player -- a secret, or anything that isn't a plain boolean -- allow
 				-- the mark. Refusing on an unreadable answer would block legitimate
@@ -416,22 +510,71 @@ local function GetWindow()
 
 	-- Divider.
 	local div = f:CreateTexture(nil, "ARTWORK")
-	div:SetColorTexture(1, 1, 1, 0.12)
-	div:SetPoint("TOPLEFT", 14, -136)
-	div:SetPoint("TOPRIGHT", -14, -136)
+	div:SetColorTexture(BRONZE_MUTED[1], BRONZE_MUTED[2], BRONZE_MUTED[3], 0.6)
+	div:SetPoint("TOPLEFT", 6, -136)
+	div:SetPoint("TOPRIGHT", -6, -136)
 	div:SetHeight(1)
 
 	----------------------------------------------------------------
 	-- Scrollable list
 	----------------------------------------------------------------
-	local scroll = CreateFrame("ScrollFrame", "ThumberScroll", f, "UIPanelScrollFrameTemplate")
+	local scroll = CreateFrame("ScrollFrame", "ThumberScroll", f)
 	scroll:SetPoint("TOPLEFT", 12, -144)
-	scroll:SetPoint("TOPRIGHT", -30, -144)
+	scroll:SetPoint("TOPRIGHT", -26, -144)
 	scroll:SetHeight(MAX_VIEW)
 	local content = CreateFrame("Frame", nil, scroll)
-	content:SetSize(330, 1)
+	content:SetSize(342, 1)
 	scroll:SetScrollChild(content)
 	f.scroll, f.content = scroll, content
+
+	-- A faint track and a bronze thumb, shown only when there is something to
+	-- scroll. Drag the thumb or click the track; the wheel scrolls the list.
+	local line = CreateFrame("Frame", nil, f)
+	line:SetWidth(10)
+	line:EnableMouse(true)
+	line:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 4, 0)
+	line:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 4, 0)
+	local track = line:CreateTexture(nil, "ARTWORK")
+	track:SetWidth(2)
+	track:SetPoint("TOP")
+	track:SetPoint("BOTTOM")
+	track:SetColorTexture(BRONZE_MUTED[1], BRONZE_MUTED[2], BRONZE_MUTED[3], 0.25)
+	local thumb = line:CreateTexture(nil, "OVERLAY")
+	thumb:SetWidth(2)
+	thumb:SetColorTexture(BRONZE[1], BRONZE[2], BRONZE[3], 1)
+
+	local function ScrollRange() return scroll:GetVerticalScrollRange() or 0 end
+	local function UpdateLine()
+		local range, h = ScrollRange(), scroll:GetHeight() or 0
+		if range <= 0.5 or h <= 0 then line:Hide() return end
+		line:Show()
+		local th = math.max(16, h * h / (h + range))
+		local pos = math.max(0, math.min(1, (scroll:GetVerticalScroll() or 0) / range))
+		thumb:SetHeight(th)
+		thumb:ClearAllPoints()
+		thumb:SetPoint("TOP", line, "TOP", 0, -(h - th) * pos)
+	end
+	local function CursorToScroll()
+		local _, y = GetCursorPosition()
+		y = y / line:GetEffectiveScale()
+		local top, h, th = line:GetTop(), line:GetHeight(), thumb:GetHeight()
+		if not (top and h and h > th) then return end
+		local pos = math.max(0, math.min(1, (top - y - th / 2) / (h - th)))
+		scroll:SetVerticalScroll(pos * ScrollRange())
+	end
+	line:SetScript("OnMouseDown", function(self) self.dragging = true; thumb:SetWidth(4); CursorToScroll() end)
+	line:SetScript("OnMouseUp", function(self) self.dragging = nil; thumb:SetWidth(self:IsMouseOver() and 4 or 2) end)
+	line:SetScript("OnEnter", function() thumb:SetWidth(4) end)
+	line:SetScript("OnLeave", function(self) if not self.dragging then thumb:SetWidth(2) end end)
+	line:SetScript("OnUpdate", function(self) if self.dragging then CursorToScroll() end end)
+	scroll:EnableMouseWheel(true)
+	scroll:SetScript("OnMouseWheel", function(self, delta)
+		self:SetVerticalScroll(math.max(0, math.min(ScrollRange(), (self:GetVerticalScroll() or 0) - delta * ROW_H * 2)))
+	end)
+	scroll:HookScript("OnVerticalScroll", UpdateLine)
+	scroll:HookScript("OnScrollRangeChanged", UpdateLine)
+	scroll:HookScript("OnSizeChanged", UpdateLine)
+	f.UpdateScrollLine = UpdateLine
 
 	local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	empty:SetPoint("TOPLEFT", 18, -150)
@@ -451,7 +594,7 @@ end
 local function GetRow(i)
 	if rows[i] then return rows[i] end
 	local r = CreateFrame("Button", nil, win.content)
-	r:SetSize(330, ROW_H)
+	r:SetSize(342, ROW_H)
 
 	r.icon = r:CreateTexture(nil, "ARTWORK")
 	r.icon:SetSize(16, 16)
@@ -481,11 +624,11 @@ local function GetRow(i)
 
 	local hl = r:CreateTexture(nil, "HIGHLIGHT")
 	hl:SetAllPoints()
-	hl:SetColorTexture(1, 1, 1, 0.10)
+	hl:SetColorTexture(1, 0.82, 0, 0.06)
 
 	r.selbg = r:CreateTexture(nil, "BACKGROUND")
 	r.selbg:SetAllPoints()
-	r.selbg:SetColorTexture(1, 0.82, 0, 0.10)
+	r.selbg:SetColorTexture(BRONZE[1], BRONZE[2], BRONZE[3], 0.18)
 	r.selbg:Hide()
 
 	r:SetScript("OnClick", function(self)
@@ -515,7 +658,7 @@ function RefreshList()
 	win.empty2:SetShown(#list == 0)
 
 	-- Normalised key currently in the compose box, to highlight its row.
-	local curKey = win.nameBox:GetText():gsub("^%s+", ""):gsub("%s+$", ""):gsub("^%l", string.upper)
+	local curKey = NormalizeKey(win.nameBox:GetText())
 
 	for i, item in ipairs(list) do
 		local e = item.entry
@@ -538,6 +681,7 @@ function RefreshList()
 	for i = #list + 1, #rows do rows[i]:Hide() end
 
 	win.content:SetHeight(math.max(1, #list * ROW_H))
+	if win.UpdateScrollLine then win.UpdateScrollLine() end
 	if win.RefreshSelection then win.RefreshSelection() end
 end
 
@@ -608,6 +752,7 @@ Thumber_CapturingKey = false
 
 function Thumber_QuickMark(mark)
 	if Thumber_CapturingKey then return end
+	local chat = DB().chatLogging ~= false -- on unless the player turned it off
 	local key, name, class = KeyFromUnit("target")
 	if not key then key, name, class = KeyFromUnit("mouseover") end
 	if not key then
@@ -615,7 +760,9 @@ function Thumber_QuickMark(mark)
 		return
 	end
 	local info = MARK[mark] or MARK.neutral
-	if ToggleMark(key, name, mark, class) == "removed" then
+	local result = ToggleMark(key, name, mark, class)
+	if not chat then return end
+	if result == "removed" then
 		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
 			" un-marked (was |cff" .. MarkHex(mark) .. info.label .. "|r).")
 	else
@@ -813,6 +960,7 @@ local init = CreateFrame("Frame")
 init:RegisterEvent("PLAYER_LOGIN")
 init:SetScript("OnEvent", function(self, event)
 	DB() -- ensure table
+	MigrateSurnameKeys()
 	Thumber_UpdateMinimapButton()
 	if ApplyDefaultBindings() then
 		self:UnregisterEvent("PLAYER_REGEN_ENABLED")

@@ -22,6 +22,10 @@ sortable list window.
     them (and tells you). A *different* mark just changes it. This applies to
     the keybinds and the `/thumbsup` / `/thumbsdown` / `/neutral` commands; note
     that passing a note (e.g. `/tu great tank`) updates instead of removing.
+  - **Chat messages:** a keybind mark prints a line in chat ("marked" /
+    "un-marked"). Turn that off with **Print a chat message when a keybind
+    marks or un-marks a player** in `/thumber config`. Slash commands always
+    reply in chat.
 - **Slash commands:**
   - `/thumbsup` (`/tu`), `/thumbsdown` (`/td`), `/neutral` (`/nt`) `[note]` —
     mark your **target** (or mouseover) and, if you pass text, set its note in one
@@ -34,6 +38,15 @@ sortable list window.
   **Remove** button (or the red X on a row) deletes a mark.
 - **Minimap button:** left-click opens the list, drag to move it around the
   minimap. Toggle it in `/thumber config`.
+
+## Names
+
+On **WoW Forever** every character has a first name *and* a surname, and Thumber
+keeps both: marks, the list, the tooltip and chat messages all use the full
+"First Surname" (type it the same way in the name box). Marks saved by earlier
+versions as `First-Surname` are converted automatically the first time you log
+in. On the Anniversary client nothing changes: same-realm players are keyed by
+name, cross-realm players as `Name-Realm`.
 
 ## Tooltips
 

@@ -146,20 +146,25 @@ AddCheck("Show the minimap button  (left-click opens the list, drag to move)",
 	end,
 	18, -132)
 
+AddCheck("Print a chat message when a keybind marks or un-marks a player",
+	function() return db().chatLogging ~= false end,
+	function(v) db().chatLogging = v end,
+	18, -160)
+
 local kb = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-kb:SetPoint("TOPLEFT", 16, -176)
+kb:SetPoint("TOPLEFT", 16, -204)
 kb:SetText("Keybinds")
 
-AddBindRow("THUMBER_UP", "Thumbs up", 18, -200)
-AddBindRow("THUMBER_DOWN", "Thumbs down", 215, -200)
-AddBindRow("THUMBER_NEUTRAL", "Neutral", 18, -252)
-AddBindRow("THUMBER_TOGGLE", "Open the list", 215, -252)
+AddBindRow("THUMBER_UP", "Thumbs up", 18, -228)
+AddBindRow("THUMBER_DOWN", "Thumbs down", 215, -228)
+AddBindRow("THUMBER_NEUTRAL", "Neutral", 18, -280)
+AddBindRow("THUMBER_TOGGLE", "Open the list", 215, -280)
 
 local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-note:SetPoint("TOPLEFT", 18, -302)
+note:SetPoint("TOPLEFT", 18, -330)
 note:SetText("Bind: left-click a slot then press a key. Right-click a slot to clear.")
 local note2 = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-note2:SetPoint("TOPLEFT", 18, -316)
+note2:SetPoint("TOPLEFT", 18, -344)
 note2:SetText("These also appear under Esc > Key Bindings > Thumber.")
 
 local function refreshPanel()
