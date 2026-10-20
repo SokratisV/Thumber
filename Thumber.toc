@@ -2,7 +2,7 @@
 ## Title: Thumber
 ## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
 ## Author: Sokratis
-## Version: 1.3.1
+## Version: 1.4.0
 ## X-License: MIT
 ## IconTexture: Interface\AddOns\Thumber\thumbsup.png
 ## SavedVariables: ThumberDB

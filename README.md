@@ -37,9 +37,11 @@ sortable list window.
   - `/thumber config` — settings & keybinds.
   - `/thumber test` — preview the group-join alert.
   - `/thumber share` — export, import, or send your marks; `/thumber send <name>`.
-- **In the window:** click **Target** to load your current target, then click a
-  thumbs button. Type a note and press Enter. Click any row to edit it; the
-  **Remove** button (or the red X on a row) deletes a mark.
+- **In the window:** the marks list, with search and filters. Press **Manually Mark**
+  to add someone by typing their name (or **Use target**), picking a mark, and
+  optionally a note, then **Save mark**. Click any row to open the same dialog on
+  that player and change their mark or note, or **Remove** them; the red X on a
+  row removes a mark directly.
 - **Minimap button:** left-click opens the list, drag to move it around the
   minimap. Toggle it in `/thumber config`.
 

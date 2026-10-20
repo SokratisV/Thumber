@@ -270,7 +270,7 @@ end
 ----------------------------------------------------------------------
 -- Window
 ----------------------------------------------------------------------
-local ROW_H, MAX_VIEW = 20, 220
+local ROW_H, MAX_VIEW = 20, 250
 local win, rows
 
 local function SavePos(frame)
@@ -298,41 +298,299 @@ local function HeaderIcon(parent, texture, tip, onClick, x)
 	return b
 end
 
--- One thumbs button in the compose row. Clicking it applies that mark to the
--- player currently in the name box.
-local function MakeMarkButton(parent, mark, x, applyFn)
-	local info = MARK[mark]
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(28, 28)
-	b:SetPoint("TOPLEFT", x, -70)
-	b:SetNormalTexture(info.tex)
-	b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+----------------------------------------------------------------------
+-- The Manually Mark dialog: add or change a mark by typing a name
+----------------------------------------------------------------------
+local dlg
 
-	-- Selection glow shown when this is the active mark for the edited player.
-	local sel = b:CreateTexture(nil, "OVERLAY")
-	sel:SetPoint("CENTER")
-	sel:SetSize(36, 36)
-	sel:SetTexture("Interface\\Buttons\\CheckButtonHilight")
-	sel:SetBlendMode("ADD")
-	sel:Hide()
-	b.sel = sel
-	b.mark = mark
+-- Escape closes a window by way of UISpecialFrames, and one press closes every listed
+-- window that is open. So while this dialog is up the marks window steps off the list,
+-- and goes back on once the dialog has closed: Escape then closes the dialog first,
+-- and the window on the next press.
+local function EscapeList(name, on)
+	local at
+	for i, n in ipairs(UISpecialFrames) do
+		if n == name then at = i break end
+	end
+	if on and not at then
+		tinsert(UISpecialFrames, name)
+	elseif not on and at then
+		tremove(UISpecialFrames, at)
+	end
+end
 
-	b:SetScript("OnClick", function() applyFn(mark) end)
-	b:SetScript("OnEnter", function(self)
+-- The Use target button and the keybinds all go through KeyFromUnit, which refuses
+-- anything that isn't a player. A name typed into the box has no unit behind it to
+-- check -- unless it happens to name something we can see right now, which is how an
+-- NPC gets in: target a wolf, type its name, mark it. So check the units we *can*
+-- resolve and refuse a known non-player.
+local function IsKnownNonPlayer(name)
+	-- A cross-realm key is "Name-Realm" while UnitName gives the bare name, so
+	-- compare on the display form or the check silently never matches. On
+	-- Forever the key is the full "First Surname", which is what UnitKey builds.
+	local bare = UniqueNames() and name or DisplayName(name)
+	for _, unit in ipairs({ "target", "mouseover", "focus", name }) do
+		local key, first
+		if UnitExists(unit) then key, first = UnitKey(unit) end
+		if key and (UniqueNames() and key or first) == bare then
+			-- Only a real "no" refuses. If the client won't say whether this is a
+			-- player -- a secret, or anything that isn't a plain boolean -- allow
+			-- the mark. Refusing on an unreadable answer would block legitimate
+			-- players, and "unknown" is not "no" anywhere else in this addon.
+			local isPlayer = UnitIsPlayer(unit)
+			if IsSecret(isPlayer) or type(isPlayer) ~= "boolean" then return false end
+			return isPlayer == false
+		end
+	end
+	return false   -- nobody we can see by that name; can't say, so allow it
+end
+
+local PILL_OFF = { 0.23, 0.18, 0.11 }
+local function StylePill(b, selected)
+	local c = selected and BRONZE or PILL_OFF
+	b:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+	if selected then b:SetBackdropColor(0.25, 0.18, 0.07, 0.9) else b:SetBackdropColor(0.055, 0.047, 0.035, 0.8) end
+	if selected then b.text:SetTextColor(1, 0.82, 0) else b.text:SetTextColor(0.78, 0.72, 0.58) end
+end
+
+local function DialogButton(parent, text, w, x, y, onClick)
+	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+	b:SetSize(w, 22)
+	b:SetPoint("TOPLEFT", x, y)
+	b:SetText(text)
+	b:SetScript("OnClick", onClick)
+	return b
+end
+
+local function BuildMarkDialog()
+	local f = CreateFrame("Frame", "ThumberMarkFrame", UIParent, "BackdropTemplate")
+	-- Each mark button is as wide as its own text needs ("Thumbs Down" is the longest),
+	-- and the dialog is as wide as the three of them side by side.
+	local MARKS = { "up", "neutral", "down" }
+	local LEFT, RIGHT, GAP = 72, 16, 4
+	local probe = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	local pillW, total = {}, 0
+	for i, mark in ipairs(MARKS) do
+		probe:SetText(MarkIcon(mark, 14) .. " " .. MARK[mark].label)
+		pillW[i] = math.max(70, math.ceil(probe:GetStringWidth() or 60) + 24)
+		total = total + pillW[i] + (i > 1 and GAP or 0)
+	end
+	probe:Hide()
+	local W = math.max(344, LEFT + total + RIGHT)
+	f:SetSize(W, 262)
+	f:SetFrameStrata("DIALOG")
+	f:SetToplevel(true)
+	f:SetMovable(true)
+	f:EnableMouse(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	f:SetClampedToScreen(true)
+	f:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16 })
+	f:SetBackdropBorderColor(BRONZE[1], BRONZE[2], BRONZE[3], 1)
+	local art = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+	art:SetPoint("TOPLEFT", 5, -5)
+	art:SetPoint("BOTTOMRIGHT", -5, 5)
+	art:SetTexture("Interface\\Collections\\CollectionsBackgroundTile", "REPEAT", "REPEAT")
+	art:SetHorizTile(true)
+	art:SetVertTile(true)
+	local wash = f:CreateTexture(nil, "BACKGROUND", nil, 2)
+	wash:SetAllPoints(art)
+	wash:SetColorTexture(0, 0, 0, 0.5)
+
+	f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	f.title:SetPoint("TOPLEFT", 16, -12)
+	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", -4, -4)
+	local rule = f:CreateTexture(nil, "ARTWORK")
+	rule:SetColorTexture(BRONZE_MUTED[1], BRONZE_MUTED[2], BRONZE_MUTED[3], 0.6)
+	rule:SetHeight(1)
+	rule:SetPoint("TOPLEFT", 6, -34)
+	rule:SetPoint("TOPRIGHT", -6, -34)
+
+	f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	f.hint:SetPoint("TOPLEFT", 16, -44)
+	f.hint:SetPoint("TOPRIGHT", -16, -44)
+	f.hint:SetJustifyH("LEFT")
+	f.hint:SetText("Type a player's name or use your target, choose a mark, then save.")
+
+	f.classHint = {}
+
+	-- Player
+	local nameLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	nameLabel:SetPoint("TOPLEFT", 16, -78)
+	nameLabel:SetText("Player")
+	local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+	nameBox:SetPoint("TOPLEFT", LEFT, -73)
+	nameBox:SetSize(W - LEFT - RIGHT - 86 - 8, 20)
+	nameBox:SetAutoFocus(false)
+	nameBox:SetFontObject(ChatFontNormal)
+	f.nameBox = nameBox
+	local nameHint = nameBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	nameHint:SetPoint("LEFT", 2, 0)
+	nameHint:SetText("Name, e.g. Meowly Meow")
+	f.nameHint = nameHint
+
+	-- Mark
+	local markLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	markLabel:SetPoint("TOPLEFT", 16, -118)
+	markLabel:SetText("Mark")
+	f.pills = {}
+	local px = LEFT
+	for i, mark in ipairs(MARKS) do
+		local info = MARK[mark]
+		local p = CreateFrame("Button", nil, f, "BackdropTemplate")
+		p:SetSize(pillW[i], 26)
+		p:SetPoint("TOPLEFT", px, -112)
+		px = px + pillW[i] + GAP
+		p:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+		p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		p.text:SetPoint("CENTER")
+		p.text:SetText(MarkIcon(mark, 14) .. " " .. info.label)
+		p.mark = mark
+		p:SetScript("OnClick", function() f.mark, f.autoMark = mark, nil; f.Refresh() end)
+		f.pills[i] = p
+	end
+
+	-- Note
+	local noteLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	noteLabel:SetPoint("TOPLEFT", 16, -154)
+	noteLabel:SetText("Note")
+	local noteBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+	noteBox:SetPoint("TOPLEFT", LEFT, -149)
+	noteBox:SetSize(W - LEFT - RIGHT, 20)
+	noteBox:SetAutoFocus(false)
+	noteBox:SetFontObject(ChatFontNormal)
+	noteBox:SetMaxLetters(255)
+	f.noteBox = noteBox
+	local noteHint = noteBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	noteHint:SetPoint("LEFT", 2, 0)
+	noteHint:SetText("Optional: shown in their tooltip")
+	f.noteHint = noteHint
+
+	f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	f.status:SetPoint("TOPLEFT", 16, -186)
+	f.status:SetPoint("TOPRIGHT", -16, -186)
+	f.status:SetJustifyH("LEFT")
+	f.status:SetHeight(14)
+
+	local function Key()
+		local k = NormalizeKey(nameBox:GetText())
+		return k ~= "" and k or nil
+	end
+
+	-- Redraw everything that depends on what is typed and picked.
+	function f.Refresh()
+		local key = Key()
+		local e = key and Marks()[key]
+		-- A mark picked for you (their current one) is not carried over to someone else.
+		if f.autoMark and f.autoKey ~= key then f.mark, f.autoMark, f.autoKey = nil, nil, nil end
+		-- Someone already marked: their current mark is simply shown selected, which says
+		-- so by itself, until you pick another.
+		if e and not f.mark then f.mark, f.autoMark, f.autoKey = e.mark, true, key end
+		f.title:SetText(f.editKey and "Edit mark" or "Manually Mark")
+		nameHint:SetShown((nameBox:GetText() or "") == "")
+		noteHint:SetShown((noteBox:GetText() or "") == "")
+		for _, p in ipairs(f.pills) do StylePill(p, f.mark == p.mark) end
+		f.status:SetText((key and not e) and "New player" or "")
+		f.save:SetText(e and "Update mark" or "Save mark")
+		f.remove:SetShown(e ~= nil)
+	end
+
+	local function Fail(msg) f.status:SetText("|cffff6060" .. msg .. "|r") end
+
+	-- Fill the form from an existing mark (or just the name, for someone new).
+	local function Load(key)
+		nameBox:SetText(key or "")
+		nameBox:SetCursorPosition(0)
+		local e = key and Marks()[key]
+		if e then f.mark, f.autoMark, f.autoKey = e.mark, true, key end
+		noteBox:SetText((e and e.note) or noteBox:GetText() or "")
+		noteBox:SetCursorPosition(0)
+		f.editKey = e and key or nil
+		f.Refresh()
+	end
+
+	local function Save()
+		local key = Key()
+		if not key then return Fail("Type a player's name, or press Use target.") end
+		if not f.mark then return Fail("Pick a mark.") end
+		if IsKnownNonPlayer(key) then return Fail(key .. " isn't a player.") end
+		SetMark(key, DisplayName(key), f.mark, f.classHint[key])
+		SetNote(key, noteBox:GetText())
+		f:Hide()
+	end
+	f.Save = Save
+
+	local useTarget = DialogButton(f, "Use target", 86, W - RIGHT - 86, -72, function()
+		local key, _, class = KeyFromUnit("target")
+		if not key then key, _, class = KeyFromUnit("mouseover") end
+		if not key then return Fail("Target a player first.") end
+		f.classHint[key] = class
+		Load(key)
+	end)
+	useTarget:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText(info.label)
+		GameTooltip:SetText("Fill the name from your target (or mouseover).", nil, nil, nil, nil, true)
 		GameTooltip:Show()
 	end)
-	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	return b
+	useTarget:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+	nameBox:SetScript("OnTextChanged", function() f.Refresh() end)
+	nameBox:SetScript("OnEnterPressed", function() noteBox:SetFocus() end)
+	nameBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	noteBox:SetScript("OnTextChanged", function() f.Refresh() end)
+	noteBox:SetScript("OnEnterPressed", Save)
+	noteBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+	f.remove = DialogButton(f, "Remove", 80, 16, -222, function()
+		local key = Key()
+		if key and Marks()[key] then RemoveMark(key) end
+		f:Hide()
+	end)
+	DialogButton(f, "Cancel", 74, W - RIGHT - 88 - 6 - 74, -222, function() f:Hide() end)
+	f.save = DialogButton(f, "Save mark", 88, W - RIGHT - 88, -222, Save)
+
+	f.Load = Load
+	f:SetScript("OnShow", function() EscapeList("ThumberFrame", false) end)
+	f:SetScript("OnHide", function(self)
+		self.editKey = nil
+		RefreshList()
+		-- Put the marks window back a frame later, not now: this hide may be the Escape
+		-- loop itself, which would reach the name we just added and close it too.
+		C_Timer.After(0, function()
+			if win and win:IsShown() and not self:IsShown() then EscapeList("ThumberFrame", true) end
+		end)
+	end)
+	f:Hide()
+	EscapeList("ThumberMarkFrame", true)
+	return f
+end
+
+-- Open the dialog empty (Manually Mark), or on an existing mark to edit it.
+function ns.OpenMarkDialog(key)
+	dlg = dlg or BuildMarkDialog()
+	dlg.mark, dlg.editKey, dlg.autoMark, dlg.autoKey = nil, nil, nil, nil
+	dlg.classHint = {}
+	dlg.nameBox:SetText("")
+	dlg.noteBox:SetText("")
+	dlg:ClearAllPoints()
+	if win and win:IsShown() then
+		dlg:SetPoint("TOPLEFT", win, "TOPRIGHT", 8, 0)
+	else
+		dlg:SetPoint("CENTER", 0, 40)
+	end
+	if key and Marks()[key] then dlg.Load(key) else dlg.Refresh() end
+	dlg:Show()
+	if not (key and Marks()[key]) then dlg.nameBox:SetFocus() end
+	RefreshList()
 end
 
 local function GetWindow()
 	if win then return win end
 
 	local f = CreateFrame("Frame", "ThumberFrame", UIParent, "BackdropTemplate")
-	f:SetSize(400, 414)
+	f:SetSize(400, 392)
 	if not RestorePos(f) then f:SetPoint("CENTER") end
 	f:SetFrameStrata("DIALOG")
 	f:SetMovable(true)
@@ -345,7 +603,6 @@ local function GetWindow()
 		if SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE) end
 	end)
 	f:SetClampedToScreen(true)
-	tinsert(UISpecialFrames, "ThumberFrame") -- closes on Escape
 	f:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16 })
 	f:SetBackdropBorderColor(BRONZE[1], BRONZE[2], BRONZE[3], 1)
 	-- Blizzard's Collections tile under a black wash, inside the border.
@@ -359,6 +616,8 @@ local function GetWindow()
 	wash:SetAllPoints(art)
 	wash:SetColorTexture(0, 0, 0, 0.5)
 	f:SetScript("OnShow", function()
+		-- Closes on Escape, unless the Manually Mark dialog is up: that closes first.
+		EscapeList("ThumberFrame", not (dlg and dlg:IsShown()))
 		if SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_OPEN then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN) end
 	end)
 
@@ -391,167 +650,21 @@ local function GetWindow()
 	headerLine:SetPoint("TOPRIGHT", -6, -34)
 
 	----------------------------------------------------------------
-	-- Compose / edit area
+	-- Toolbar: the one way to add someone by hand
 	----------------------------------------------------------------
-	f.classHint = {}
-
-	local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-	nameBox:SetPoint("TOPLEFT", 16, -44)
-	nameBox:SetSize(196, 20)
-	nameBox:SetAutoFocus(false)
-	nameBox:SetFontObject(ChatFontNormal)
-	f.nameBox = nameBox
-
-	local targetBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	targetBtn:SetSize(80, 22)
-	targetBtn:SetPoint("LEFT", nameBox, "RIGHT", 12, 0)
-	targetBtn:SetText("Target")
-	targetBtn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Fill from your target (or mouseover).", nil, nil, nil, nil, true)
+	local markBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	markBtn:SetSize(130, 22)
+	markBtn:SetPoint("TOPLEFT", 14, -43)
+	markBtn:SetText("Manually Mark")
+	markBtn:SetScript("OnClick", function() ns.OpenMarkDialog(nil) end)
+	markBtn:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText("Manually Mark")
+		GameTooltip:AddLine("Mark someone by typing their name, without targeting them. You can also set their note.", 0.85, 0.85, 0.85, true)
 		GameTooltip:Show()
 	end)
-	targetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-	-- Current mark of whoever is in the name box. The name is trimmed and its
-	-- first letter capitalised so a typed "bob" matches the "Bob" that the Target
-	-- button and slash commands produce (WoW always capitalises player names).
-	local function CurrentEntry()
-		local key = NormalizeKey(nameBox:GetText())
-		if key == "" then return nil end
-		return key, Marks()[key]
-	end
-
-	-- Highlight which mark button is active for the edited player.
-	local function RefreshSelection()
-		local _, e = CurrentEntry()
-		local active = e and e.mark
-		for _, b in ipairs(f.markButtons) do
-			b.sel:SetShown(b.mark == active)
-		end
-	end
-	f.RefreshSelection = RefreshSelection
-
-	-- Load an existing entry into the compose area.
-	local function LoadEntry(key)
-		nameBox:SetText(key or "")
-		nameBox:SetCursorPosition(0)
-		local e = key and Marks()[key]
-		f.noteBox:SetText((e and e.note) or "")
-		f.noteBox:SetCursorPosition(0)
-		RefreshSelection()
-	end
-	f.LoadEntry = LoadEntry
-
-	-- The Target button and the keybinds all go through KeyFromUnit, which refuses
-	-- anything that isn't a player. A name typed into the box has no unit behind it
-	-- to check -- unless it happens to name something we can see right now, which is
-	-- how an NPC gets in: target a wolf, type its name, mark it. So check the units
-	-- we *can* resolve and refuse a known non-player.
-	local function IsKnownNonPlayer(name)
-		-- A cross-realm key is "Name-Realm" while UnitName gives the bare name, so
-		-- compare on the display form or the check silently never matches. On
-		-- Forever the key is the full "First Surname", which is what UnitKey builds.
-		local bare = UniqueNames() and name or DisplayName(name)
-		for _, unit in ipairs({ "target", "mouseover", "focus", name }) do
-			local key, first
-			if UnitExists(unit) then key, first = UnitKey(unit) end
-			if key and (UniqueNames() and key or first) == bare then
-				-- Only a real "no" refuses. If the client won't say whether this is a
-				-- player -- a secret, or anything that isn't a plain boolean -- allow
-				-- the mark. Refusing on an unreadable answer would block legitimate
-				-- players, and "unknown" is not "no" anywhere else in this addon.
-				local isPlayer = UnitIsPlayer(unit)
-				if IsSecret(isPlayer) or type(isPlayer) ~= "boolean" then return false end
-				return isPlayer == false
-			end
-		end
-		return false   -- nobody we can see by that name; can't say, so allow it
-	end
-
-	local function ApplyMark(mark)
-		local key = CurrentEntry()
-		if not key then
-			UIErrorsFrame:AddMessage("Thumber: type a name or click Target first.", 1, 0.4, 0.4)
-			return
-		end
-		if IsKnownNonPlayer(key) then
-			UIErrorsFrame:AddMessage("Thumber: " .. key .. " isn't a player.", 1, 0.4, 0.4)
-			return
-		end
-		local name = DisplayName(key)
-		SetMark(key, name, mark, f.classHint[key])
-		-- A note already typed but not yet committed should stick to the mark.
-		local note = f.noteBox:GetText()
-		if note and note ~= "" then SetNote(key, note) end
-		RefreshSelection()
-	end
-
-	targetBtn:SetScript("OnClick", function()
-		local key, name, class = KeyFromUnit("target")
-		if not key then key, name, class = KeyFromUnit("mouseover") end
-		if not key then
-			UIErrorsFrame:AddMessage("Thumber: no player targeted.", 1, 0.4, 0.4)
-			return
-		end
-		f.classHint[key] = class
-		LoadEntry(key)
-	end)
-
-	-- Mark buttons + a "Mark:" label.
-	local markLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	markLabel:SetPoint("TOPLEFT", 16, -78)
-	markLabel:SetText("Mark:")
-	f.markButtons = {
-		MakeMarkButton(f, "up", 56, ApplyMark),
-		MakeMarkButton(f, "neutral", 92, ApplyMark),
-		MakeMarkButton(f, "down", 128, ApplyMark),
-	}
-
-	local delBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	delBtn:SetSize(80, 22)
-	delBtn:SetPoint("TOPRIGHT", -16, -72)
-	delBtn:SetText("Remove")
-	delBtn:SetScript("OnClick", function()
-		local key = CurrentEntry()
-		if key and Marks()[key] then
-			RemoveMark(key)
-			LoadEntry(nil)
-		end
-	end)
-
-	-- Note box (saves on Enter or focus loss).
-	local noteLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	noteLabel:SetPoint("TOPLEFT", 16, -110)
-	noteLabel:SetText("Note:")
-	local noteBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-	noteBox:SetPoint("LEFT", noteLabel, "RIGHT", 10, 0)
-	noteBox:SetPoint("RIGHT", f, "RIGHT", -16, 0)
-	noteBox:SetHeight(20)
-	noteBox:SetAutoFocus(false)
-	noteBox:SetFontObject(ChatFontNormal)
-	noteBox:SetMaxLetters(255)
-	f.noteBox = noteBox
-	local function CommitNote()
-		local key = CurrentEntry()
-		if key then SetNote(key, noteBox:GetText()) end
-		noteBox:ClearFocus()
-	end
-	noteBox:SetScript("OnEnterPressed", CommitNote)
-	noteBox:SetScript("OnEditFocusLost", CommitNote)
-	noteBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-	-- Refresh the selection glow as the typed name changes.
-	nameBox:SetScript("OnTextChanged", function() RefreshSelection() end)
-	nameBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-	nameBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-	-- Divider.
-	local div = f:CreateTexture(nil, "ARTWORK")
-	div:SetColorTexture(BRONZE_MUTED[1], BRONZE_MUTED[2], BRONZE_MUTED[3], 0.6)
-	div:SetPoint("TOPLEFT", 6, -136)
-	div:SetPoint("TOPRIGHT", -6, -136)
-	div:SetHeight(1)
+	markBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	f.markBtn = markBtn
 
 	----------------------------------------------------------------
 	-- Search and filter
@@ -559,8 +672,9 @@ local function GetWindow()
 	f.filter, f.search = "all", ""
 
 	local searchBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-	searchBox:SetPoint("TOPLEFT", 20, -145)
-	searchBox:SetSize(150, 20)
+	searchBox:SetPoint("TOPLEFT", 20, -72)
+	searchBox:SetPoint("TOPRIGHT", -20, -72)
+	searchBox:SetHeight(20)
 	searchBox:SetAutoFocus(false)
 	searchBox:SetFontObject(ChatFontNormal)
 	local hint = searchBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -584,7 +698,7 @@ local function GetWindow()
 		local key, w = PILLS[i][1], PILLS[i][2]
 		local p = CreateFrame("Button", nil, f, "BackdropTemplate")
 		p:SetSize(w, 20)
-		p:SetPoint("TOPRIGHT", x, -145)
+		p:SetPoint("TOPRIGHT", x, -44)
 		p:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
 		p:SetBackdropColor(0.055, 0.047, 0.035, 0.8)
 		p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -599,8 +713,8 @@ local function GetWindow()
 	-- Scrollable list
 	----------------------------------------------------------------
 	local scroll = CreateFrame("ScrollFrame", "ThumberScroll", f)
-	scroll:SetPoint("TOPLEFT", 12, -174)
-	scroll:SetPoint("TOPRIGHT", -26, -174)
+	scroll:SetPoint("TOPLEFT", 12, -102)
+	scroll:SetPoint("TOPRIGHT", -26, -102)
 	scroll:SetHeight(MAX_VIEW)
 	local content = CreateFrame("Frame", nil, scroll)
 	content:SetSize(362, 1)
@@ -657,13 +771,17 @@ local function GetWindow()
 	f.UpdateScrollLine = UpdateLine
 
 	local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	empty:SetPoint("TOPLEFT", 18, -180)
-	empty:SetText("No marked players yet. Target someone and press the Target button,")
+	empty:SetPoint("TOPLEFT", 18, -108)
+	empty:SetText("No marked players yet. Press Manually Mark, or target someone")
 	local empty2 = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	empty2:SetPoint("TOPLEFT", 18, -194)
-	empty2:SetText("or use /thumbsup | /thumbsdown | /neutral, or the arrow keys.")
+	empty2:SetPoint("TOPLEFT", 18, -122)
+	empty2:SetText("and use /thumbsup | /thumbsdown | /neutral, or the arrow keys.")
 	f.empty, f.empty2 = empty, empty2
 	f.emptyText = { empty:GetText(), empty2:GetText() }
+
+	local tip = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	tip:SetPoint("BOTTOMLEFT", 16, 12)
+	tip:SetText("Click a player to edit their mark or note.")
 
 	-- CreateFrame frames are shown by default; start hidden so the first toggle
 	-- opens the window instead of hiding the freshly-created (already-shown) one.
@@ -718,7 +836,7 @@ local function GetRow(i)
 	r.selbg:Hide()
 
 	r:SetScript("OnClick", function(self)
-		if self.key then win.LoadEntry(self.key) end
+		if self.key then ns.OpenMarkDialog(self.key) end
 	end)
 	r:SetScript("OnEnter", function(self)
 		local e = self.key and Marks()[self.key]
@@ -770,8 +888,8 @@ function RefreshList()
 		win.empty:SetText("No marks match your search or filter."); win.empty2:SetText("")
 	end
 
-	-- Normalised key currently in the compose box, to highlight its row.
-	local curKey = NormalizeKey(win.nameBox:GetText())
+	-- The player being edited in the dialog, to highlight their row.
+	local curKey = dlg and dlg:IsShown() and dlg.editKey or nil
 
 	for i, item in ipairs(list) do
 		local e = item.entry
@@ -796,7 +914,6 @@ function RefreshList()
 
 	win.content:SetHeight(math.max(1, #list * ROW_H))
 	if win.UpdateScrollLine then win.UpdateScrollLine() end
-	if win.RefreshSelection then win.RefreshSelection() end
 end
 
 ----------------------------------------------------------------------
