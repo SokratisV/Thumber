@@ -26,6 +26,8 @@ sortable list window.
     "un-marked"). Turn that off with **Print a chat message when a keybind
     marks or un-marks a player** in `/thumber config`. Slash commands always
     reply in chat.
+- **Settings:** `/thumber config` (or the minimap button's right-click) opens the
+  settings window, described under *Settings* below.
 - **Slash commands:**
   - `/thumbsup` (`/tu`), `/thumbsdown` (`/td`), `/neutral` (`/nt`) `[note]` —
     mark your **target** (or mouseover) and, if you pass text, set its note in one
@@ -33,6 +35,8 @@ sortable list window.
   - `/thumber` (`/th`) — open the marks list.
   - `/thumber note <text>` — set a note on your target.
   - `/thumber config` — settings & keybinds.
+  - `/thumber test` — preview the group-join alert.
+  - `/thumber share` — export, import, or send your marks; `/thumber send <name>`.
 - **In the window:** click **Target** to load your current target, then click a
   thumbs button. Type a note and press Enter. Click any row to edit it; the
   **Remove** button (or the red X on a row) deletes a mark.
@@ -55,6 +59,82 @@ the mark (and, optionally, the note). Both can be toggled in settings:
 
 - **Show my mark in player tooltips** — the mark line.
 - **Also show the note text in tooltips** — appends your note underneath.
+- **Show the whole note** — wraps the full note onto as many lines as it needs;
+  turn it off for a single shortened line.
+
+## Badges and alerts
+
+Marked players are easy to spot without opening anything. Each of these has a
+switch on the **Badges** and **Alerts** pages of the settings window.
+
+- **Nameplate badge** — the mark's icon beside a marked player's nameplate: above,
+  below, left or right of it. Pick the look (**Icon** or **Ring**) and the size.
+- **Target frame badge** — a small badge on your target's portrait.
+- **Chat badge** — the mark's icon at the start of a marked player's chat lines.
+- **Group alert** — a toast (with a sound of your choice) when a marked player is
+  in your group or raid, once per time they join. Click it to dismiss. Try it
+  with **Show real alert** or `/thumber test`. Choose its sound: Raid Warning, Alarm
+  Clock, PvP Queue, or none. **Unlock the alert** (Alerts page) to drag it anywhere on screen; it remembers
+  the spot.
+- **Pop animation** — the target badge pops when a keybind marks your target.
+
+**Preview.** The **Badges** page opens with a live preview (and **Alerts** with one of the toast): a mock nameplate
+(level box included), target portrait, group alert and chat lines, all drawn by
+the same code the game uses and redrawn the moment you change anything. **Preview
+as** switches between the three marks, **Replay pop** plays the animation, and
+**Show real alert** fires the actual toast.
+
+**Fine-tuning.** Badge size; the nameplate anchor (above, below, left, right) and
+an X/Y offset of up to 200 either way, to clear other nameplate elements; and which
+corner of the target portrait the badge sits on (top right by default, clear of
+Blizzard's level number). On nameplates the badge is layered above Blizzard's level
+box; on the target frame it uses the frame's own layer, so it never covers windows.
+
+The marks window also has a **search box** (names and notes), **filter pills**
+with counts (All / thumbs up / neutral / thumbs down), and a **last seen** column.
+Hover a row for the zone and level you last saw them at. Thumber records a
+sighting when you target, mouse over, or group with a marked player.
+
+## Settings
+
+`/thumber config` opens Thumber's own settings window, styled after FlareUI (bronze
+trim over Blizzard's Collections tile): the pages down the left, the page's settings
+in the middle under headings that fold, and on the right what the setting you're
+pointing at does. Blizzard's own controls throughout.
+
+| Page | What's on it |
+| --- | --- |
+| **General** | Tooltips (your mark, your note, the whole note), the chat message and chat icon, the minimap button |
+| **Badges** | Nameplate and target-frame badges, style, size, pop animation, offsets and corner, with a live preview pinned above; **Reset badge look** |
+| **Alerts** | The group alert, its sound, where it appears (unlock to drag), and a preview of the toast |
+| **Sharing** | Whether to accept offers, and the share window |
+| **Keybinds** | The four keys; click one and press a key, right-click clears |
+
+Blizzard's own Settings window (Esc → Options → AddOns → Thumber) carries a small
+page with a button that opens it.
+
+## Sharing your marks
+
+Click **Share** in the marks window (or `/thumber share`). Two ways to hand your
+marks to someone:
+
+- **Send to a player** — type a name (or press **Target**) and **Send**
+  (`/thumber send <name>` does the same). They get an **Accept / Decline**
+  prompt; nothing arrives unless they accept. Only marks they don't already have
+  are added, so their own marks are never overwritten. Both of you need Thumber,
+  and you must be able to whisper each other.
+- **Export / import** — **Export all** produces one `THUMBER:...` string. Paste it
+  in Discord, a document, wherever, and the other person pastes it into the same
+  box and presses **Preview import**. The preview says how many marks are new,
+  how many differ from theirs, and how many they already have, then lets them
+  **Add new only** or **Add new and overwrite**.
+
+Marks only travel between the same kind of client: WoW Forever marks (with
+surnames) can't be imported on the Anniversary client or the other way round.
+Anything that comes in is checked first: invalid entries are dropped, colour and
+link codes are stripped from names and notes, and sizes are capped. To refuse
+offers entirely, untick **Let other players offer me their marks** in
+`/thumber config`.
 
 ## Data
 

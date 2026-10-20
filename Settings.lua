@@ -1,179 +1,34 @@
-local ADDON = ...
+local ADDON, ns = ...
+
+-- Blizzard's own Settings window only gets a small page for Thumber: a pointer to the
+-- real settings window (Options.lua), which is where everything lives.
 
 local panel = CreateFrame("Frame")
 panel.name = "Thumber"
 local category -- new Settings API category, when available
-local refreshers = {}   -- run on every panel show, to resync widgets with the game state
 
-local function db()
-	ThumberDB = ThumberDB or {}
-	return ThumberDB
-end
-
-----------------------------------------------------------------------
--- Widgets
-----------------------------------------------------------------------
-local function AddCheck(label, get, set, x, y)
-	local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-	cb:SetPoint("TOPLEFT", x, y)
-	local fs = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	fs:SetPoint("LEFT", cb, "RIGHT", 4, 0)
-	fs:SetText(label)
-	cb:SetScript("OnShow", function(self) self:SetChecked(get() and true or false) end)
-	refreshers[#refreshers + 1] = function() cb:SetChecked(get() and true or false) end
-	cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
-	return cb
-end
-
--- A click-then-press-a-key capture row bound directly to a Bindings.xml action.
-local function AddBindRow(bindingName, label, x, y)
-	local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	title:SetPoint("TOPLEFT", x, y)
-	title:SetText(label)
-
-	local btn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-	btn:SetSize(175, 24)
-	btn:SetPoint("TOPLEFT", x, y - 16)
-
-	local function refresh()
-		if btn.listening then return end
-		local k = GetBindingKey(bindingName)
-		btn:SetText(k and ("|cff00ff00" .. k .. "|r") or "Click to set key")
-	end
-	-- Also driven from the panel itself: a child's OnShow is not a reliable moment
-	-- to resync inside a Settings canvas category, which is why these rows came up
-	-- reading "Click to set key" for keys that were in fact bound.
-	refreshers[#refreshers + 1] = refresh
-
-	local function clear()
-		local o1, o2 = GetBindingKey(bindingName)
-		if o1 then SetBinding(o1) end
-		if o2 then SetBinding(o2) end
-		Thumber_SaveBindings()
-		btn.listening = false; Thumber_CapturingKey = false; btn:EnableKeyboard(false)
-		refresh()
-	end
-
-	btn:SetScript("OnShow", refresh)
-	btn:SetScript("OnHide", function(self)
-		self.listening = false; Thumber_CapturingKey = false
-		self:EnableKeyboard(false)
-		-- Make sure we never leave the keyboard "consumed" if the panel is closed
-		-- mid-capture. SetPropagateKeyboardInput is protected in combat — skip then.
-		if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
-	end)
-	btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	btn:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Left-click: set key\nRight-click: clear", nil, nil, nil, nil, true)
-		GameTooltip:Show()
-	end)
-	btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	btn:SetScript("OnClick", function(self, mouseButton)
-		if mouseButton == "RightButton" then clear(); return end
-		-- SetPropagateKeyboardInput is protected and blocked in combat lockdown;
-		-- don't start key capture there (it would throw ADDON_ACTION_BLOCKED).
-		if InCombatLockdown() then return end
-		self.listening = true; Thumber_CapturingKey = true
-		self:SetText("Press a key… (Esc cancels)")
-		self:EnableKeyboard(true)
-		self:SetPropagateKeyboardInput(false) -- consume keys only while capturing
-	end)
-	btn:SetScript("OnKeyDown", function(self, key)
-		-- Not capturing → let every key pass straight through to the game. This is
-		-- the safety net that guarantees the keyboard can never stay "stuck".
-		if not self.listening then
-			if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
-			return
-		end
-		if key == "ESCAPE" then
-			self.listening = false; Thumber_CapturingKey = false
-			self:EnableKeyboard(false)
-			if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
-			refresh()
-			return
-		end
-		-- Wait for a real key; ignore lone modifiers (stay in capture mode).
-		if key == "LSHIFT" or key == "RSHIFT" or key == "LCTRL" or key == "RCTRL"
-			or key == "LALT" or key == "RALT" or key == "UNKNOWN" then
-			return
-		end
-		-- WoW's canonical modifier order is ALT-CTRL-SHIFT; a wrong order silently
-		-- fails to register multi-modifier combos.
-		local combo = ""
-		if IsAltKeyDown() then combo = combo .. "ALT-" end
-		if IsControlKeyDown() then combo = combo .. "CTRL-" end
-		if IsShiftKeyDown() then combo = combo .. "SHIFT-" end
-		combo = combo .. key
-		local o1, o2 = GetBindingKey(bindingName)
-		if o1 then SetBinding(o1) end
-		if o2 then SetBinding(o2) end
-		if SetBinding(combo, bindingName) then Thumber_SaveBindings() end
-		self.listening = false; Thumber_CapturingKey = false
-		self:EnableKeyboard(false)
-		if not InCombatLockdown() then self:SetPropagateKeyboardInput(true) end
-		refresh()
-	end)
-	return btn
-end
-
-----------------------------------------------------------------------
--- Layout
-----------------------------------------------------------------------
 local titleFS = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 titleFS:SetPoint("TOPLEFT", 16, -16)
 titleFS:SetText("Thumber")
 
-local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-sub:SetPoint("TOPLEFT", 16, -40)
-sub:SetText("Mark players thumbs up / neutral / thumbs down, with an optional note.")
+local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+sub:SetPoint("TOPLEFT", 16, -44)
+sub:SetPoint("RIGHT", -16, 0)
+sub:SetJustifyH("LEFT")
+sub:SetSpacing(3)
+sub:SetText("Thumber's settings have their own window: tooltips and chat, the badges above nameplates, the group alert, sharing, and keybinds, each with a live preview.")
 
-AddCheck("Show my mark in player tooltips",
-	function() return db().showInTooltip ~= false end,
-	function(v) db().showInTooltip = v end,
-	18, -72)
+local open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+open:SetSize(200, 26)
+open:SetPoint("TOPLEFT", 16, -96)
+open:SetText("Open Thumber settings")
+open:SetScript("OnClick", function() if ns.OpenOptions then ns.OpenOptions() end end)
 
-AddCheck("Also show the note text in tooltips",
-	function() return db().showNoteInTooltip ~= false end,
-	function(v) db().showNoteInTooltip = v end,
-	36, -100)
+local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+hint:SetPoint("TOPLEFT", open, "BOTTOMLEFT", 0, -10)
+hint:SetText("You can also type /thumber config, or right-click the minimap button.")
 
-AddCheck("Show the minimap button  (left-click opens the list, drag to move)",
-	function() return not (db().minimap and db().minimap.hide) end,
-	function(v)
-		local m = db(); m.minimap = m.minimap or {}; m.minimap.hide = not v
-		if Thumber_UpdateMinimapButton then Thumber_UpdateMinimapButton() end
-	end,
-	18, -132)
-
-AddCheck("Print a chat message when a keybind marks or un-marks a player",
-	function() return db().chatLogging ~= false end,
-	function(v) db().chatLogging = v end,
-	18, -160)
-
-local kb = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-kb:SetPoint("TOPLEFT", 16, -204)
-kb:SetText("Keybinds")
-
-AddBindRow("THUMBER_UP", "Thumbs up", 18, -228)
-AddBindRow("THUMBER_DOWN", "Thumbs down", 215, -228)
-AddBindRow("THUMBER_NEUTRAL", "Neutral", 18, -280)
-AddBindRow("THUMBER_TOGGLE", "Open the list", 215, -280)
-
-local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-note:SetPoint("TOPLEFT", 18, -330)
-note:SetText("Bind: left-click a slot then press a key. Right-click a slot to clear.")
-local note2 = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-note2:SetPoint("TOPLEFT", 18, -344)
-note2:SetText("These also appear under Esc > Key Bindings > Thumber.")
-
-local function refreshPanel()
-	for _, fn in ipairs(refreshers) do fn() end
-end
-panel:SetScript("OnShow", refreshPanel)
--- The modern Settings frame drives canvas panels through these rather than a
--- child's OnShow, which is why the bound keys weren't showing.
-panel.OnRefresh = refreshPanel
+panel.OnRefresh = function() end
 panel.OnCommit  = function() end
 panel.OnDefault = function() end
 
@@ -187,11 +42,8 @@ elseif InterfaceOptions_AddCategory then
 	InterfaceOptions_AddCategory(panel)
 end
 
+-- Everything that used to open Blizzard's page (the slash command, the minimap button,
+-- the marks window's gear) now toggles the settings window.
 function Thumber_OpenSettings()
-	if category and Settings and Settings.OpenToCategory then
-		Settings.OpenToCategory(category:GetID())
-	elseif InterfaceOptionsFrame_OpenToCategory then
-		InterfaceOptionsFrame_OpenToCategory(panel) -- called twice to work around
-		InterfaceOptionsFrame_OpenToCategory(panel) -- a long-standing classic bug
-	end
+	if ns.ToggleOptions then ns.ToggleOptions() end
 end

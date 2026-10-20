@@ -4,7 +4,7 @@
 -- WoW Forever (Interface 16001, Midnight 12.x API) and TBC Classic / Anniversary
 -- (Interface 20505). Self-contained apart from the embedded LibDBIcon stack.
 
-local ADDON = ...
+local ADDON, ns = ...
 
 -- Friendly names shown in Esc > Key Bindings (next to Thumber).
 BINDING_HEADER_THUMBER = "Thumber"
@@ -175,11 +175,21 @@ local function ClassHex(class)
 	return nil
 end
 
+-- Shared with Extras.lua, which loads right after this file.
+ns.MARK, ns.DB, ns.Marks = MARK, DB, Marks
+ns.IsSecret, ns.UnitKey, ns.UniqueNames = IsSecret, UnitKey, UniqueNames
+ns.DisplayName, ns.ClassHex, ns.MarkIcon = DisplayName, ClassHex, MarkIcon
+ns.NormalizeKey = NormalizeKey
+
 ----------------------------------------------------------------------
 -- Data API
 ----------------------------------------------------------------------
 local RefreshList -- forward decl (defined with the window)
-local function Refresh() if RefreshList then RefreshList() end end
+local function Refresh()
+	if RefreshList then RefreshList() end
+	if ns.OnMarksChanged then ns.OnMarksChanged() end -- badges follow the data
+end
+ns.Refresh = Refresh
 
 local function SetMark(key, name, mark, class)
 	if not key or key == "" then return end
@@ -227,10 +237,15 @@ local function ToggleMark(key, name, mark, class)
 end
 
 -- Sorted snapshot of all marks: grouped by mark (up, neutral, down) then name.
-local function SortedMarks()
+local function SortedMarks(filter, search)
 	local list = {}
 	for key, e in pairs(Marks()) do
-		list[#list + 1] = { key = key, entry = e }
+		local keep = not filter or filter == "all" or e.mark == filter
+		if keep and search and search ~= "" then
+			keep = DisplayName(key, e):lower():find(search, 1, true)
+				or (e.note and e.note:lower():find(search, 1, true))
+		end
+		if keep then list[#list + 1] = { key = key, entry = e } end
 	end
 	table.sort(list, function(a, b)
 		local oa = (MARK[a.entry.mark] or MARK.neutral).order
@@ -239,6 +254,17 @@ local function SortedMarks()
 		return DisplayName(a.key, a.entry):lower() < DisplayName(b.key, b.entry):lower()
 	end)
 	return list
+end
+
+-- "just now", "5m ago", "3h ago", "2d ago", "4w ago".
+local function Ago(t)
+	if not t then return "" end
+	local d = time() - t
+	if d < 60 then return "just now" end
+	if d < 3600 then return ("%dm ago"):format(math.floor(d / 60)) end
+	if d < 86400 then return ("%dh ago"):format(math.floor(d / 3600)) end
+	if d < 604800 then return ("%dd ago"):format(math.floor(d / 86400)) end
+	return ("%dw ago"):format(math.floor(d / 604800))
 end
 
 ----------------------------------------------------------------------
@@ -306,7 +332,7 @@ local function GetWindow()
 	if win then return win end
 
 	local f = CreateFrame("Frame", "ThumberFrame", UIParent, "BackdropTemplate")
-	f:SetSize(380, 384)
+	f:SetSize(400, 414)
 	if not RestorePos(f) then f:SetPoint("CENTER") end
 	f:SetFrameStrata("DIALOG")
 	f:SetMovable(true)
@@ -344,6 +370,18 @@ local function GetWindow()
 	close:SetPoint("TOPRIGHT", -4, -4)
 	HeaderIcon(f, "Interface\\Buttons\\UI-OptionsButton", "Settings",
 		function() if Thumber_OpenSettings then Thumber_OpenSettings() end end, -38)
+
+	local shareBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	shareBtn:SetSize(54, 20)
+	shareBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -60, -9)
+	shareBtn:SetText("Share")
+	shareBtn:SetScript("OnClick", function() if ns.OpenShare then ns.OpenShare() end end)
+	shareBtn:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText("Send your marks to someone, or export and import them.", nil, nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	shareBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 	-- Bronze rule under the header, as in FlareUI's windows.
 	local headerLine = f:CreateTexture(nil, "ARTWORK")
@@ -516,14 +554,56 @@ local function GetWindow()
 	div:SetHeight(1)
 
 	----------------------------------------------------------------
+	-- Search and filter
+	----------------------------------------------------------------
+	f.filter, f.search = "all", ""
+
+	local searchBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+	searchBox:SetPoint("TOPLEFT", 20, -145)
+	searchBox:SetSize(150, 20)
+	searchBox:SetAutoFocus(false)
+	searchBox:SetFontObject(ChatFontNormal)
+	local hint = searchBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hint:SetPoint("LEFT", 2, 0)
+	hint:SetText("Search names and notes")
+	searchBox:SetScript("OnTextChanged", function(self)
+		local text = self:GetText() or ""
+		hint:SetShown(text == "")
+		f.search = text:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+		RefreshList()
+	end)
+	searchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	searchBox:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+	f.searchBox = searchBox
+
+	-- One pill per filter, right-aligned: All, thumbs up, neutral, thumbs down.
+	f.pills = {}
+	local PILLS = { { "all", 52 }, { "up", 46 }, { "neutral", 46 }, { "down", 46 } }
+	local x = -14
+	for i = #PILLS, 1, -1 do
+		local key, w = PILLS[i][1], PILLS[i][2]
+		local p = CreateFrame("Button", nil, f, "BackdropTemplate")
+		p:SetSize(w, 20)
+		p:SetPoint("TOPRIGHT", x, -145)
+		p:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+		p:SetBackdropColor(0.055, 0.047, 0.035, 0.8)
+		p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		p.text:SetPoint("CENTER")
+		p.key = key
+		p:SetScript("OnClick", function() f.filter = key; RefreshList() end)
+		f.pills[i] = p
+		x = x - w - 4
+	end
+
+	----------------------------------------------------------------
 	-- Scrollable list
 	----------------------------------------------------------------
 	local scroll = CreateFrame("ScrollFrame", "ThumberScroll", f)
-	scroll:SetPoint("TOPLEFT", 12, -144)
-	scroll:SetPoint("TOPRIGHT", -26, -144)
+	scroll:SetPoint("TOPLEFT", 12, -174)
+	scroll:SetPoint("TOPRIGHT", -26, -174)
 	scroll:SetHeight(MAX_VIEW)
 	local content = CreateFrame("Frame", nil, scroll)
-	content:SetSize(342, 1)
+	content:SetSize(362, 1)
 	scroll:SetScrollChild(content)
 	f.scroll, f.content = scroll, content
 
@@ -577,12 +657,13 @@ local function GetWindow()
 	f.UpdateScrollLine = UpdateLine
 
 	local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	empty:SetPoint("TOPLEFT", 18, -150)
+	empty:SetPoint("TOPLEFT", 18, -180)
 	empty:SetText("No marked players yet. Target someone and press the Target button,")
 	local empty2 = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	empty2:SetPoint("TOPLEFT", 18, -164)
+	empty2:SetPoint("TOPLEFT", 18, -194)
 	empty2:SetText("or use /thumbsup | /thumbsdown | /neutral, or the arrow keys.")
 	f.empty, f.empty2 = empty, empty2
+	f.emptyText = { empty:GetText(), empty2:GetText() }
 
 	-- CreateFrame frames are shown by default; start hidden so the first toggle
 	-- opens the window instead of hiding the freshly-created (already-shown) one.
@@ -594,7 +675,7 @@ end
 local function GetRow(i)
 	if rows[i] then return rows[i] end
 	local r = CreateFrame("Button", nil, win.content)
-	r:SetSize(342, ROW_H)
+	r:SetSize(362, ROW_H)
 
 	r.icon = r:CreateTexture(nil, "ARTWORK")
 	r.icon:SetSize(16, 16)
@@ -616,9 +697,14 @@ local function GetRow(i)
 		if r.key then RemoveMark(r.key) end
 	end)
 
+	r.time = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	r.time:SetPoint("RIGHT", r.del, "LEFT", -6, 0)
+	r.time:SetWidth(58)
+	r.time:SetJustifyH("RIGHT")
+
 	r.text = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	r.text:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
-	r.text:SetPoint("RIGHT", r.del, "LEFT", -6, 0)
+	r.text:SetPoint("RIGHT", r.time, "LEFT", -6, 0)
 	r.text:SetJustifyH("LEFT")
 	r.text:SetWordWrap(false)
 
@@ -642,6 +728,13 @@ local function GetRow(i)
 		local info = MARK[e.mark] or MARK.neutral
 		GameTooltip:AddLine(MarkIcon(e.mark) .. " |cff" .. MarkHex(e.mark) .. info.label .. "|r")
 		if e.note then GameTooltip:AddLine("\"" .. e.note .. "\"", 0.85, 0.85, 0.85, true) end
+		if e.lastSeen then
+			GameTooltip:AddLine(("Last seen %s%s%s"):format(Ago(e.lastSeen),
+				e.zone and (" in " .. e.zone) or "", e.level and (", level " .. e.level) or ""), 0.6, 0.55, 0.43, true)
+		end
+		if e.time then
+			GameTooltip:AddLine("Marked " .. date("%Y-%m-%d", e.time), 0.6, 0.55, 0.43)
+		end
 		GameTooltip:Show()
 	end)
 	r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -653,9 +746,29 @@ end
 -- (Re)render the list of all marked players.
 function RefreshList()
 	if not win or not win:IsShown() then return end
-	local list = SortedMarks()
+	local list = SortedMarks(win.filter, win.search)
 	win.empty:SetShown(#list == 0)
 	win.empty2:SetShown(#list == 0)
+
+	-- Counts for the filter pills, and which pill is active.
+	local counts = { all = 0, up = 0, neutral = 0, down = 0 }
+	for _, e in pairs(Marks()) do
+		counts.all = counts.all + 1
+		counts[e.mark] = (counts[e.mark] or 0) + 1
+	end
+	for _, p in ipairs(win.pills) do
+		local active = win.filter == p.key
+		local label = p.key == "all" and ("All " .. counts.all) or (MarkIcon(p.key) .. " " .. (counts[p.key] or 0))
+		p.text:SetText(label)
+		p.text:SetTextColor(active and 1 or 0.7, active and 0.82 or 0.65, active and 0 or 0.5)
+		local c = active and BRONZE or { 0.23, 0.18, 0.11 }
+		p:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+	end
+	if counts.all == 0 then
+		win.empty:SetText(win.emptyText[1]); win.empty2:SetText(win.emptyText[2])
+	else
+		win.empty:SetText("No marks match your search or filter."); win.empty2:SetText("")
+	end
 
 	-- Normalised key currently in the compose box, to highlight its row.
 	local curKey = NormalizeKey(win.nameBox:GetText())
@@ -675,6 +788,7 @@ function RefreshList()
 			text = text .. "  |cff909090" .. preview .. "|r"
 		end
 		r.text:SetText(text)
+		r.time:SetText(Ago(e.lastSeen or e.time))
 		r.selbg:SetShown(item.key == curKey)
 		r:Show()
 	end
@@ -713,6 +827,53 @@ end
 -- appended after the tooltip has already sized itself. The tooltip data API lays
 -- the tooltip out again after every post-call, and calling Show() from inside one
 -- can re-enter the processor, so we skip it there.
+-- A cut that never lands inside a multi-byte character.
+local function CutAt(text, n)
+	if #text <= n then return text, "" end
+	local cut = n
+	while cut > 1 do
+		local b = text:byte(cut + 1)
+		if not (b and b >= 128 and b <= 191) then break end
+		cut = cut - 1
+	end
+	return text:sub(1, cut), text:sub(cut + 1)
+end
+ns.CutAt = CutAt
+
+-- The note as tooltip lines. It is wrapped here, word by word, instead of with
+-- AddLine's wrap flag: a wrapped line added after the tooltip has sized itself is
+-- not given the extra height on the modern tooltip path, so a long note was cut
+-- off. Separate plain lines size correctly everywhere.
+local NOTE_LINE = 38
+local function AddNoteLines(tip, note)
+	if not (ns.Opt and ns.Opt("tooltipFullNote")) then
+		local head, rest = CutAt(note, NOTE_PREVIEW)
+		tip:AddLine("\"" .. head .. (rest ~= "" and "..." or "") .. "\"", 0.85, 0.85, 0.85)
+		return
+	end
+	local lines, line = {}, ""
+	for word in note:gmatch("%S+") do
+		while #word > NOTE_LINE do -- a word longer than a line is split
+			if line ~= "" then lines[#lines + 1] = line; line = "" end
+			local head, rest = CutAt(word, NOTE_LINE)
+			lines[#lines + 1] = head
+			word = rest
+		end
+		if line == "" then
+			line = word
+		elseif #line + 1 + #word <= NOTE_LINE then
+			line = line .. " " .. word
+		else
+			lines[#lines + 1] = line
+			line = word
+		end
+	end
+	if line ~= "" then lines[#lines + 1] = line end
+	for i, text in ipairs(lines) do
+		tip:AddLine((i == 1 and "\"" or "") .. text .. (i == #lines and "\"" or ""), 0.85, 0.85, 0.85)
+	end
+end
+
 local function OnTooltipUnit(self, resize)
 	if DB().showInTooltip == false then return end
 	if self.IsForbidden and self:IsForbidden() then return end
@@ -723,7 +884,7 @@ local function OnTooltipUnit(self, resize)
 	local info = MARK[e.mark] or MARK.neutral
 	self:AddLine(MarkIcon(e.mark) .. " Thumber: |cff" .. MarkHex(e.mark) .. info.label .. "|r")
 	if e.note and e.note ~= "" and DB().showNoteInTooltip ~= false then
-		self:AddLine("\"" .. e.note .. "\"", 0.85, 0.85, 0.85, true)
+		AddNoteLines(self, e.note)
 	end
 	if resize then self:Show() end
 end
@@ -761,6 +922,7 @@ function Thumber_QuickMark(mark)
 	end
 	local info = MARK[mark] or MARK.neutral
 	local result = ToggleMark(key, name, mark, class)
+	if ns.OnQuickMark then ns.OnQuickMark(key, result, mark) end
 	if not chat then return end
 	if result == "removed" then
 		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
@@ -844,6 +1006,13 @@ SlashCmdList.THUMBER = function(msg)
 		Print(name .. "'s note set.")
 	elseif cmd == "config" or cmd == "options" then
 		if Thumber_OpenSettings then Thumber_OpenSettings() end
+	elseif cmd == "share" or cmd == "export" or cmd == "import" then
+		if ns.OpenShare then ns.OpenShare() end
+	elseif cmd == "send" then
+		local ok, err = ns.SendMarks(rest)
+		Print(ok and ("offering your marks to " .. rest .. ".") or err)
+	elseif cmd == "test" then
+		if ns.TestAlert then ns.TestAlert() end
 	elseif cmd == "resetbinds" or cmd == "bindreset" then
 		local ok, count = ApplyDefaultBindings(true)
 		if not ok then
@@ -859,6 +1028,9 @@ SlashCmdList.THUMBER = function(msg)
 		Print("  /thumber note <text> — set a note on your target")
 		Print("  /thumber config — settings & keybinds")
 		Print("  /thumber resetbinds — re-apply the arrow-key defaults")
+		Print("  /thumber test — preview the group-join alert")
+		Print("  /thumber share — export, import, or send your marks")
+		Print("  /thumber send <player> — offer your marks to a player")
 	end
 end
 
