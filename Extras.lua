@@ -516,6 +516,8 @@ local function BuildToast()
 		local point, _, relPoint, x, y = self:GetPoint()
 		if point then DB().alertPos = { point, relPoint, x, y } end
 	end)
+	-- A click of either mouse button dismisses it (not while it is unlocked for moving).
+	f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	f:SetScript("OnClick", function() if not ns.alertUnlocked then ns.DismissAlert() end end)
 	return f
 end

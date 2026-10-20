@@ -72,7 +72,8 @@ switch on the **Badges** and **Alerts** pages of the settings window.
 - **Target frame badge** — a small badge on your target's portrait.
 - **Chat badge** — the mark's icon at the start of a marked player's chat lines.
 - **Group alert** — a toast (with a sound of your choice) when a marked player is
-  in your group or raid, once per time they join. Click it to dismiss. Try it
+  in your group or raid, once per time they join. Right-click it (or click it) to
+  dismiss. Try it
   with **Show real alert** or `/thumber test`. Choose its sound: Raid Warning, Alarm
   Clock, PvP Queue, or none. **Unlock the alert** (Alerts page) to drag it anywhere on screen; it remembers
   the spot.

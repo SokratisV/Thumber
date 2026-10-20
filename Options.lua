@@ -823,7 +823,7 @@ local function definePages()
 			sections = {
 				{ key = "group", title = "Group alert", rows = {
 					Toggle("groupAlert", "Alert when a marked player is in my group",
-						"Shows the toast with the player's name, mark and your note. Click it to dismiss; it goes by itself after a few seconds."),
+						"Shows the toast with the player's name, mark and your note. Right-click (or click) it to dismiss; it goes by itself after a few seconds."),
 					Choice("alertSound", "Sound",
 						"The sound that plays with the alert. Picking one plays it.",
 						function() return ns.SoundChoices() end,
@@ -1029,6 +1029,47 @@ end
 
 local NAV = { "general", "badges", "alerts", "sharing", "keybinds" }
 
+-- Escape closes the window by way of UISpecialFrames, and one press closes every frame
+-- listed there that is open, so closing Blizzard's own Settings window (opened from
+-- Esc > Options > AddOns, which is how people reach this one) would take this window
+-- with it. So while Blizzard's window is up, ours is taken off the list, and put back
+-- once that window closes: the next Escape then closes only ours.
+local function Escapable(on)
+	local at
+	for i, name in ipairs(UISpecialFrames) do
+		if name == "ThumberOptions" then at = i break end
+	end
+	if on and not at then
+		tinsert(UISpecialFrames, "ThumberOptions")
+	elseif not on and at then
+		tremove(UISpecialFrames, at)
+	end
+end
+
+local function BlizzardSettings()
+	return _G.SettingsPanel or _G.InterfaceOptionsFrame
+end
+
+local function BlizzardSettingsShown()
+	local sp = BlizzardSettings()
+	return sp and sp:IsShown() and true or false
+end
+
+local watching
+local function WatchBlizzardSettings()
+	local sp = BlizzardSettings()
+	if watching or not (sp and sp.HookScript) then return end
+	watching = true
+	sp:HookScript("OnShow", function() Escapable(false) end)
+	sp:HookScript("OnHide", function()
+		-- Put back a frame later, not now: this hide may be the Escape loop itself, which
+		-- would reach the name we just added and close this window too.
+		C_Timer.After(0, function()
+			if frame and frame:IsShown() and not BlizzardSettingsShown() then Escapable(true) end
+		end)
+	end)
+end
+
 local function BuildWindow()
 	definePages()
 	local saved = ns.DB().optionsPage
@@ -1059,8 +1100,9 @@ local function BuildWindow()
 	wash:SetAllPoints(base)
 	wash:SetColorTexture(0, 0, 0, 0.5)
 	frame:Hide()
-	tinsert(UISpecialFrames, "ThumberOptions")
 	frame:SetScript("OnShow", function()
+		WatchBlizzardSettings()
+		Escapable(not BlizzardSettingsShown())
 		Sound("IG_CHARACTER_INFO_OPEN")
 		Panel.Refresh()
 		ShowPageInfo()
