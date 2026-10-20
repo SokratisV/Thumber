@@ -28,6 +28,7 @@ local DEFAULTS = {
 	chatLogging    = true,   -- chat line when a keybind marks or un-marks a player
 	tooltipFullNote = true,  -- the whole note in the unit tooltip, not just its start
 	shareReceive   = true,   -- let other players offer you their marks (you still get asked)
+	shareScope     = "all",  -- what you share: "all" marks, or "down" (thumbs downs only)
 	showInTooltip  = true,   -- your mark in a player's tooltip
 	showNoteInTooltip = true, -- ...and your note under it
 }
@@ -639,6 +640,7 @@ end
 OnMarksChanged = function()
 	RefreshPlates()
 	UpdateTarget()
+	if ns.RefreshShareScope then ns.RefreshShareScope() end -- the share window's counts
 end
 ns.OnMarksChanged = OnMarksChanged
 

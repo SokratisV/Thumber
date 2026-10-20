@@ -854,6 +854,9 @@ local function definePages()
 						"When someone offers to share their marks you get an Accept / Decline prompt. Nothing arrives unless you accept, and only marks you don't already have are added. Off declines every offer."),
 				} },
 				{ key = "share", title = "Share", rows = {
+					Choice("shareScope", "What to share",
+						"All marks, or only your thumbs downs: handy for warning a friend about the players you would rather they avoided, without handing over your whole list. It applies to sending to a player and to exporting.",
+						{ { value = "all", text = "All marks" }, { value = "down", text = "Thumbs down only" } }),
 					Button("Share window", "Opens the share window: send your marks to a player, or export them as text and import someone else's, with a preview of what an import would change.",
 						"Open sharing", function() if ns.OpenShare then ns.OpenShare() end end,
 						{ tip = "Also /thumber share." }),
@@ -1029,45 +1032,14 @@ end
 
 local NAV = { "general", "badges", "alerts", "sharing", "keybinds" }
 
--- Escape closes the window by way of UISpecialFrames, and one press closes every frame
--- listed there that is open, so closing Blizzard's own Settings window (opened from
--- Esc > Options > AddOns, which is how people reach this one) would take this window
--- with it. So while Blizzard's window is up, ours is taken off the list, and put back
--- once that window closes: the next Escape then closes only ours.
-local function Escapable(on)
-	local at
-	for i, name in ipairs(UISpecialFrames) do
-		if name == "ThumberOptions" then at = i break end
-	end
-	if on and not at then
-		tinsert(UISpecialFrames, "ThumberOptions")
-	elseif not on and at then
-		tremove(UISpecialFrames, at)
-	end
-end
-
-local function BlizzardSettings()
-	return _G.SettingsPanel or _G.InterfaceOptionsFrame
-end
-
-local function BlizzardSettingsShown()
-	local sp = BlizzardSettings()
-	return sp and sp:IsShown() and true or false
-end
-
-local watching
-local function WatchBlizzardSettings()
-	local sp = BlizzardSettings()
-	if watching or not (sp and sp.HookScript) then return end
-	watching = true
-	sp:HookScript("OnShow", function() Escapable(false) end)
-	sp:HookScript("OnHide", function()
-		-- Put back a frame later, not now: this hide may be the Escape loop itself, which
-		-- would reach the name we just added and close this window too.
-		C_Timer.After(0, function()
-			if frame and frame:IsShown() and not BlizzardSettingsShown() then Escapable(true) end
-		end)
-	end)
+-- Blizzard's own Settings window is where people find the launcher page for this one
+-- (Esc > Options > AddOns). Like other addons' settings windows, ours closes it when it
+-- opens, so the two are never up together. Skipped in combat, when UI panels can't be
+-- hidden from addon code; the window still opens.
+local function CloseBlizzardSettings()
+	if InCombatLockdown() or not HideUIPanel then return end
+	local sp = _G.SettingsPanel or _G.InterfaceOptionsFrame
+	if sp and sp:IsShown() then HideUIPanel(sp) end
 end
 
 local function BuildWindow()
@@ -1100,9 +1072,8 @@ local function BuildWindow()
 	wash:SetAllPoints(base)
 	wash:SetColorTexture(0, 0, 0, 0.5)
 	frame:Hide()
+	tinsert(UISpecialFrames, "ThumberOptions")
 	frame:SetScript("OnShow", function()
-		WatchBlizzardSettings()
-		Escapable(not BlizzardSettingsShown())
 		Sound("IG_CHARACTER_INFO_OPEN")
 		Panel.Refresh()
 		ShowPageInfo()
@@ -1216,11 +1187,17 @@ end
 
 function ns.ToggleOptions()
 	if not frame then BuildWindow() end
-	frame:SetShown(not frame:IsShown())
+	if frame:IsShown() then
+		frame:Hide()
+	else
+		CloseBlizzardSettings()
+		frame:Show()
+	end
 end
 
 function ns.OpenOptions()
 	if not frame then BuildWindow() end
+	CloseBlizzardSettings()
 	frame:Show()
 end
 

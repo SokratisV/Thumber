@@ -362,6 +362,85 @@ local function DialogButton(parent, text, w, x, y, onClick)
 	return b
 end
 
+----------------------------------------------------------------------
+-- Bulk clear: remove every mark the list is showing
+----------------------------------------------------------------------
+-- The filter and the search both apply, so "thumbs down" + Clear removes the thumbs
+-- downs and nothing else. It takes a second click (no dialog), and what it removed can
+-- be brought back with Undo for a little while.
+local CLEAR_ARM, UNDO_FOR = 4, 15
+local clearState = { armedSig = nil, undo = nil }
+
+local function ShownKeys()
+	local keys = {}
+	for _, item in ipairs(SortedMarks(win.filter, win.search)) do keys[#keys + 1] = item.key end
+	return keys
+end
+
+-- What the button would clear right now; arming is only good for this exact list.
+local function ClearSig(n) return (win.filter or "all") .. "|" .. (win.search or "") .. "|" .. n end
+
+local function ClearClick()
+	if clearState.undo then
+		local undo = clearState.undo
+		clearState.undo = nil
+		for key, entry in pairs(undo.entries) do
+			if not Marks()[key] then Marks()[key] = entry end -- never over something added since
+		end
+		Refresh()
+		return
+	end
+	local keys = ShownKeys()
+	if #keys == 0 then return end
+	local sig = ClearSig(#keys)
+	if clearState.armedSig ~= sig then
+		clearState.armedSig = sig
+		C_Timer.After(CLEAR_ARM, function()
+			if clearState.armedSig == sig then
+				clearState.armedSig = nil
+				RefreshList()
+			end
+		end)
+		RefreshList()
+		return
+	end
+	local stash = {}
+	for _, key in ipairs(keys) do
+		stash[key] = Marks()[key]
+		Marks()[key] = nil
+	end
+	clearState.armedSig = nil
+	local undo = { entries = stash, n = #keys }
+	clearState.undo = undo
+	C_Timer.After(UNDO_FOR, function()
+		if clearState.undo == undo then
+			clearState.undo = nil
+			RefreshList()
+		end
+	end)
+	Refresh()
+end
+
+-- The button's label, from the list as it is now.
+local function UpdateClearButton(n)
+	local b = win.clearBtn
+	if clearState.armedSig and clearState.armedSig ~= ClearSig(n) then clearState.armedSig = nil end
+	if clearState.undo then
+		b:SetText("Undo clear (" .. clearState.undo.n .. ")")
+		b:Enable()
+	elseif n == 0 then
+		b:SetText("Nothing to clear")
+		b:Disable()
+	elseif clearState.armedSig then
+		b:SetText("|cffff6060Click again: clear " .. n .. "|r")
+		b:Enable()
+	else
+		local everything = (win.filter or "all") == "all" and (win.search or "") == ""
+		b:SetText((everything and "Clear all (" or "Clear shown (") .. n .. ")")
+		b:Enable()
+	end
+end
+
 local function BuildMarkDialog()
 	local f = CreateFrame("Frame", "ThumberMarkFrame", UIParent, "BackdropTemplate")
 	-- Each mark button is as wide as its own text needs ("Thumbs Down" is the longest),
@@ -781,7 +860,20 @@ local function GetWindow()
 
 	local tip = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	tip:SetPoint("BOTTOMLEFT", 16, 12)
-	tip:SetText("Click a player to edit their mark or note.")
+	tip:SetText("Click a player to edit them.")
+
+	local clearBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	clearBtn:SetSize(160, 20)
+	clearBtn:SetPoint("BOTTOMRIGHT", -14, 8)
+	clearBtn:SetScript("OnClick", ClearClick)
+	clearBtn:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText("Clear marks")
+		GameTooltip:AddLine("Removes every mark the list is showing; the filter and the search both apply. Click twice to confirm. Afterwards an Undo button is offered for " .. UNDO_FOR .. " seconds.", 0.85, 0.85, 0.85, true)
+		GameTooltip:Show()
+	end)
+	clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	f.clearBtn = clearBtn
 
 	-- CreateFrame frames are shown by default; start hidden so the first toggle
 	-- opens the window instead of hiding the freshly-created (already-shown) one.
@@ -914,6 +1006,7 @@ function RefreshList()
 
 	win.content:SetHeight(math.max(1, #list * ROW_H))
 	if win.UpdateScrollLine then win.UpdateScrollLine() end
+	UpdateClearButton(#list)
 end
 
 ----------------------------------------------------------------------

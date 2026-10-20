@@ -88,16 +88,29 @@ local function Clean(s, max)
 	return (ns.CutAt(s, max))
 end
 
--- All marks as one text block, and how many there were.
-local function Serialize()
+-- What can be shared: every mark, or only the thumbs downs (to warn someone about the
+-- people you would rather they avoided, without handing over your whole list).
+local SCOPES = {
+	all  = { label = "All marks", none = "You have no marks to share.", of = "marks" },
+	down = { label = "Thumbs down only", none = "You have no thumbs down marks to share.", of = "thumbs down marks" },
+}
+local function ScopeOf(scope)
+	return SCOPES[scope] and scope or "all"
+end
+
+-- The marks in a scope as one text block, and how many there were.
+local function Serialize(scope)
+	scope = ScopeOf(scope)
 	local lines = { "THUMBER" .. VERSION, "u=" .. (ns.UniqueNames() and "1" or "0") }
 	local n = 0
 	for key, e in pairs(Marks()) do
+		if scope == "all" or e.mark == scope then
 		n = n + 1
 		lines[#lines + 1] = table.concat({
 			Esc(key), e.mark or "neutral", e.class or "",
 			tostring(math.floor(tonumber(e.time) or 0)), Esc(e.note),
 		}, "\t")
+		end
 	end
 	return table.concat(lines, "\n"), n
 end
@@ -133,8 +146,8 @@ local function ParsePayload(raw)
 end
 
 -- The pasteable form, and its reverse.
-local function Export()
-	local payload, n = Serialize()
+local function Export(scope)
+	local payload, n = Serialize(scope)
 	return "THUMBER:" .. B64Encode(payload), n
 end
 
@@ -186,7 +199,7 @@ local function Apply(entries, overwrite)
 end
 
 ns.Share = {
-	B64Encode = B64Encode, B64Decode = B64Decode, Serialize = Serialize, Export = Export,
+	B64Encode = B64Encode, B64Decode = B64Decode, Serialize = Serialize, Export = Export, ScopeOf = ScopeOf,
 	Parse = Parse, Compare = Compare, Apply = Apply,
 }
 
@@ -242,11 +255,12 @@ local function Pump(o)
 end
 
 -- Offer our marks to `target`; the transfer starts when they accept.
-function ns.SendMarks(target)
+function ns.SendMarks(target, scope)
+	scope = ScopeOf(scope or ns.Opt("shareScope"))
 	target = ns.NormalizeKey(target or "")
 	if target == "" then return false, "Type a player's name first." end
-	local payload, count = Serialize()
-	if count == 0 then return false, "You have no marks to share." end
+	local payload, count = Serialize(scope)
+	if count == 0 then return false, SCOPES[scope].none end
 	local data = B64Encode(payload)
 	local chunks = {}
 	for i = 1, #data, CHUNK do chunks[#chunks + 1] = data:sub(i, i + CHUNK - 1) end
@@ -257,7 +271,7 @@ function ns.SendMarks(target)
 	if not ok then return false, "Couldn't send anything to " .. target .. "." end
 	local o = { id = id, target = target, chunks = chunks, idx = 0, count = count }
 	out = o
-	Status(("Waiting for %s to accept %d marks..."):format(target, count))
+	Status(("Waiting for %s to accept %d %s..."):format(target, count, SCOPES[scope].of))
 	C_Timer.After(OFFER_WAIT, function()
 		if out == o and not o.sending then
 			out = nil
@@ -424,6 +438,55 @@ local function BuildDialog()
 	close:SetPoint("TOPRIGHT", -4, -4)
 	Rule(f, -34)
 
+	-- What to share, for both ways below: two choices side by side, the chosen one lit,
+	-- each with how many marks it covers.
+	f.scopePills = {}
+	local function ScopePill(scope)
+		local p = CreateFrame("Button", nil, f, "BackdropTemplate")
+		p:SetHeight(22)
+		p:SetBackdrop({ bgFile = "Interface\Buttons\WHITE8X8", edgeFile = "Interface\Buttons\WHITE8X8", edgeSize = 1 })
+		p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		p.text:SetPoint("CENTER")
+		p.scope = scope
+		p:SetScript("OnClick", function()
+			ns.SetOpt("shareScope", scope)
+			f.UpdateScope()
+		end)
+		p:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+			GameTooltip:SetText(SCOPES[scope].label)
+			GameTooltip:AddLine(scope == "all"
+				and "Share every mark you have. Applies to sending to a player and to exporting."
+				or "Share only the players you marked thumbs down, so you can warn someone without handing over your whole list. Applies to sending to a player and to exporting.",
+				0.85, 0.85, 0.85, true)
+			GameTooltip:Show()
+		end)
+		p:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		return p
+	end
+	local downPill, allPill = ScopePill("down"), ScopePill("all")
+	downPill:SetPoint("TOPRIGHT", -40, -8)
+	allPill:SetPoint("RIGHT", downPill, "LEFT", -4, 0)
+	f.scopePills[1], f.scopePills[2] = allPill, downPill
+
+	function f.UpdateScope()
+		local scope = ScopeOf(ns.Opt("shareScope"))
+		local counts = { all = 0, down = 0 }
+		for _, e in pairs(Marks()) do
+			counts.all = counts.all + 1
+			if e.mark == "down" then counts.down = counts.down + 1 end
+		end
+		for _, p in ipairs(f.scopePills) do
+			p.text:SetText(SCOPES[p.scope].label .. " (" .. counts[p.scope] .. ")")
+			p:SetWidth(math.ceil(p.text:GetStringWidth() or 80) + 22)
+			local on = p.scope == scope
+			local c = on and BRONZE or { 0.23, 0.18, 0.11 }
+			p:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+			if on then p:SetBackdropColor(0.25, 0.18, 0.07, 0.9) else p:SetBackdropColor(0.055, 0.047, 0.035, 0.8) end
+			if on then p.text:SetTextColor(1, 0.82, 0) else p.text:SetTextColor(0.78, 0.72, 0.58) end
+		end
+	end
+
 	-- Send to a player
 	local sendLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	sendLabel:SetPoint("TOPLEFT", 16, -46)
@@ -508,14 +571,15 @@ local function BuildDialog()
 	f.addNew, f.addAll = addNew, addAll
 
 	local function ClearParsed() f.parsed = nil; addNew:Hide(); addAll:Hide() end
-	Button(f, "Export all", 100, 16, -312, function()
+	Button(f, "Export", 100, 16, -312, function()
 		ClearParsed()
-		local text, n = Export()
-		if n == 0 then summary:SetText("You have no marks to export.") return end
+		local scope = ScopeOf(ns.Opt("shareScope"))
+		local text, n = Export(scope)
+		if n == 0 then summary:SetText((SCOPES[scope].none:gsub("share", "export"))) return end
 		eb:SetText(text)
 		eb:HighlightText()
 		eb:SetFocus()
-		summary:SetText(("%d marks exported. Press Ctrl+C to copy, then paste it wherever you like."):format(n))
+		summary:SetText(("%d %s exported. Press Ctrl+C to copy, then paste it wherever you like."):format(n, SCOPES[scope].of))
 	end)
 	Button(f, "Preview import", 120, 122, -312, function()
 		ClearParsed()
@@ -535,6 +599,7 @@ local function BuildDialog()
 		summary:SetText("")
 	end)
 
+	f.UpdateScope()
 	f:Hide()
 	return f
 end
@@ -583,8 +648,13 @@ function ShowOffer(o)
 	end)
 end
 
+function ns.RefreshShareScope()
+	if dlg then dlg.UpdateScope() end
+end
+
 function ns.OpenShare()
 	dlg = dlg or BuildDialog()
+	dlg.UpdateScope()
 	Status = function(text) if dlg then dlg.status:SetText(text or "") end end
 	if dlg:IsShown() then dlg:Hide() else dlg:Show() end
 end

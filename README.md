@@ -93,6 +93,11 @@ corner of the target portrait the badge sits on (top right by default, clear of
 Blizzard's level number). On nameplates the badge is layered above Blizzard's level
 box; on the target frame it uses the frame's own layer, so it never covers windows.
 
+The marks window's **Clear** button (bottom right) removes every mark the list is
+showing, with the filter and search applied, so *thumbs down* + Clear removes only
+the thumbs downs. It needs a second click to confirm, and an **Undo** button
+appears for 15 seconds afterwards.
+
 The marks window also has a **search box** (names and notes), **filter pills**
 with counts (All / thumbs up / neutral / thumbs down), and a **last seen** column.
 Hover a row for the zone and level you last saw them at. Thumber records a
@@ -131,6 +136,11 @@ marks to someone:
   box and presses **Preview import**. The preview says how many marks are new,
   how many differ from theirs, and how many they already have, then lets them
   **Add new only** or **Add new and overwrite**.
+
+**What to share.** The two choices at the top of the share window, *All marks* and
+*Thumbs down only* (each with its count), pick what goes out, for both ways. The
+same choice is **What to share** in the settings. The second is for warning a friend about the players you would rather they avoided,
+without handing over your whole list.
 
 Marks only travel between the same kind of client: WoW Forever marks (with
 surnames) can't be imported on the Anniversary client or the other way round.
