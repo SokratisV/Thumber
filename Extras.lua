@@ -618,23 +618,39 @@ local function GroupUnits()
 	return units
 end
 
+-- The alert is for a marked player ARRIVING, so it fires once per arrival, however many
+-- times the roster changes after it. `announced` remembers who has had theirs.
+--
+-- Blizzard sends GROUP_ROSTER_UPDATE for every join and leave, and while the roster is
+-- changing its party1..4 slots shift and a name can be unreadable for a moment. If a
+-- marked player merely looked absent in such a scan and was forgotten, they would be
+-- announced again on the next one. So someone is forgotten only after a scan in which
+-- the whole roster could be read and they were not in it.
 local function ScanGroup()
 	if not (IsInGroup and IsInGroup()) then wipe(announced) return end
-	local present = {}
+	local present, complete = {}, true
 	for _, unit in ipairs(GroupUnits()) do
-		if UnitExists(unit) and not UnitIsUnit(unit, "player") then
-			local e, key = MarkFor(unit)
-			if e then
+		if not UnitExists(unit) then
+			complete = false                      -- a slot the game says is full, still empty
+		elseif not UnitIsUnit(unit, "player") then
+			local key = UnitKey(unit)
+			if not key then
+				complete = false                  -- a name that cannot be read yet
+			else
 				present[key] = true
-				Sighted(e, unit)
-				if not announced[key] and ns.Opt("groupAlert") then
-					announced[key] = true
-					Alert(key, e, unit)
+				local e = Marks()[key]
+				if e then
+					Sighted(e, unit)
+					if not announced[key] and ns.Opt("groupAlert") then
+						announced[key] = true
+						Alert(key, e, unit)
+					end
 				end
 			end
 		end
 	end
-	-- Someone who left and comes back later should be announced again.
+	if not complete then return end
+	-- Someone who really left and comes back later should be announced again.
 	for key in pairs(announced) do
 		if not present[key] then announced[key] = nil end
 	end
