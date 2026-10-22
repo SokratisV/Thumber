@@ -22,7 +22,7 @@
 ## Notes-zhTW: 用讚 / 中立 / 倒讚標記玩家，並可附上備註。會顯示在滑鼠提示與清單中。
 ## Notes-itIT: Segna i giocatori con pollice su / neutrale / pollice giù e una nota facoltativa. Compare nelle descrizioni e in un elenco.
 ## Author: Sokratis
-## Version: 1.5.0
+## Version: 1.6.0
 ## X-License: MIT
 ## IconTexture: Interface\AddOns\Thumber\thumbsup.png
 ## SavedVariables: ThumberDB
