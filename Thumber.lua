@@ -5,13 +5,14 @@
 -- (Interface 20505). Self-contained apart from the embedded LibDBIcon stack.
 
 local ADDON, ns = ...
+local L = ns.L
 
 -- Friendly names shown in Esc > Key Bindings (next to Thumber).
 BINDING_HEADER_THUMBER = "Thumber"
-BINDING_NAME_THUMBER_UP = "Thumbs up target  (default: Arrow Up)"
-BINDING_NAME_THUMBER_DOWN = "Thumbs down target  (default: Arrow Down)"
-BINDING_NAME_THUMBER_NEUTRAL = "Neutral target  (default: Arrow Left)"
-BINDING_NAME_THUMBER_TOGGLE = "Open the marks list  (default: Arrow Right)"
+BINDING_NAME_THUMBER_UP = L["Thumbs up target  (default: Arrow Up)"]
+BINDING_NAME_THUMBER_DOWN = L["Thumbs down target  (default: Arrow Down)"]
+BINDING_NAME_THUMBER_NEUTRAL = L["Neutral target  (default: Arrow Left)"]
+BINDING_NAME_THUMBER_TOGGLE = L["Open the marks list  (default: Arrow Right)"]
 
 ----------------------------------------------------------------------
 -- Constants
@@ -21,19 +22,19 @@ BINDING_NAME_THUMBER_TOGGLE = "Open the marks list  (default: Arrow Right)"
 -- down (red cross).
 local MARK = {
 	up = {
-		label = "Thumbs Up",
+		label = L["Thumbs Up"],
 		tex   = "Interface\\RaidFrame\\ReadyCheck-Ready",
 		color = { 0.30, 0.85, 0.35 },
 		order = 1,
 	},
 	neutral = {
-		label = "Neutral",
+		label = L["Neutral"],
 		tex   = "Interface\\RaidFrame\\ReadyCheck-Waiting",
 		color = { 0.95, 0.82, 0.25 },
 		order = 2,
 	},
 	down = {
-		label = "Thumbs Down",
+		label = L["Thumbs Down"],
 		tex   = "Interface\\RaidFrame\\ReadyCheck-NotReady",
 		color = { 0.92, 0.32, 0.32 },
 		order = 3,
@@ -260,11 +261,11 @@ end
 local function Ago(t)
 	if not t then return "" end
 	local d = time() - t
-	if d < 60 then return "just now" end
-	if d < 3600 then return ("%dm ago"):format(math.floor(d / 60)) end
-	if d < 86400 then return ("%dh ago"):format(math.floor(d / 3600)) end
-	if d < 604800 then return ("%dd ago"):format(math.floor(d / 86400)) end
-	return ("%dw ago"):format(math.floor(d / 604800))
+	if d < 60 then return L["just now"] end
+	if d < 3600 then return L["%dm ago"]:format(math.floor(d / 60)) end
+	if d < 86400 then return L["%dh ago"]:format(math.floor(d / 3600)) end
+	if d < 604800 then return L["%dd ago"]:format(math.floor(d / 86400)) end
+	return L["%dw ago"]:format(math.floor(d / 604800))
 end
 
 ----------------------------------------------------------------------
@@ -362,11 +363,14 @@ local function StylePill(b, selected)
 	if selected then b.text:SetTextColor(1, 0.82, 0) else b.text:SetTextColor(0.78, 0.72, 0.58) end
 end
 
-local function DialogButton(parent, text, w, x, y, onClick)
+-- A button as wide as its own text needs (never narrower than minWidth); the caller places
+-- it. German and Russian labels run much longer than English ones.
+local function DialogButton(parent, text, minWidth, onClick)
 	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	b:SetSize(w, 22)
-	b:SetPoint("TOPLEFT", x, y)
+	b:SetHeight(22)
 	b:SetText(text)
+	local fs = b:GetFontString()
+	b:SetWidth(math.max(minWidth, math.ceil(fs and fs:GetStringWidth() or 60) + 28))
 	b:SetScript("OnClick", onClick)
 	return b
 end
@@ -435,19 +439,21 @@ local function UpdateClearButton(n)
 	local b = win.clearBtn
 	if clearState.armedSig and clearState.armedSig ~= ClearSig(n) then clearState.armedSig = nil end
 	if clearState.undo then
-		b:SetText("Undo clear (" .. clearState.undo.n .. ")")
+		b:SetText(L["Undo clear (%d)"]:format(clearState.undo.n))
 		b:Enable()
 	elseif n == 0 then
-		b:SetText("Nothing to clear")
+		b:SetText(L["Nothing to clear"])
 		b:Disable()
 	elseif clearState.armedSig then
-		b:SetText("|cffff6060Click again: clear " .. n .. "|r")
+		b:SetText("|cffff6060" .. L["Click again: clear %d"]:format(n) .. "|r")
 		b:Enable()
 	else
 		local everything = (win.filter or "all") == "all" and (win.search or "") == ""
-		b:SetText((everything and "Clear all (" or "Clear shown (") .. n .. ")")
+		b:SetText((everything and L["Clear all (%d)"] or L["Clear shown (%d)"]):format(n))
 		b:Enable()
 	end
+	local fs = b:GetFontString()
+	b:SetWidth(math.max(160, math.ceil(fs and fs:GetStringWidth() or 100) + 28))
 end
 
 local function BuildMarkDialog()
@@ -455,8 +461,14 @@ local function BuildMarkDialog()
 	-- Each mark button is as wide as its own text needs ("Thumbs Down" is the longest),
 	-- and the dialog is as wide as the three of them side by side.
 	local MARKS = { "up", "neutral", "down" }
-	local LEFT, RIGHT, GAP = 72, 16, 4
+	local RIGHT, GAP = 16, 4
 	local probe = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	-- the field labels (Player / Mark / Note) take as much room as the longest needs
+	local LEFT = 72
+	for _, label in ipairs({ L["Player"], L["Mark"], L["Note"] }) do
+		probe:SetText(label)
+		LEFT = math.max(LEFT, math.ceil(probe:GetStringWidth() or 40) + 28)
+	end
 	local pillW, total = {}, 0
 	for i, mark in ipairs(MARKS) do
 		probe:SetText(MarkIcon(mark, 14) .. " " .. MARK[mark].label)
@@ -500,29 +512,29 @@ local function BuildMarkDialog()
 	f.hint:SetPoint("TOPLEFT", 16, -44)
 	f.hint:SetPoint("TOPRIGHT", -16, -44)
 	f.hint:SetJustifyH("LEFT")
-	f.hint:SetText("Type a player's name or use your target, choose a mark, then save.")
+	f.hint:SetText(L["Type a player's name or use your target, choose a mark, then save."])
 
 	f.classHint = {}
 
 	-- Player
 	local nameLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	nameLabel:SetPoint("TOPLEFT", 16, -78)
-	nameLabel:SetText("Player")
+	nameLabel:SetText(L["Player"])
 	local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
 	nameBox:SetPoint("TOPLEFT", LEFT, -73)
-	nameBox:SetSize(W - LEFT - RIGHT - 86 - 8, 20)
+	nameBox:SetHeight(20)
 	nameBox:SetAutoFocus(false)
 	nameBox:SetFontObject(ChatFontNormal)
 	f.nameBox = nameBox
 	local nameHint = nameBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	nameHint:SetPoint("LEFT", 2, 0)
-	nameHint:SetText("Name, e.g. Meowly Meow")
+	nameHint:SetText(L["Name, e.g. Meowly Meow"])
 	f.nameHint = nameHint
 
 	-- Mark
 	local markLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	markLabel:SetPoint("TOPLEFT", 16, -118)
-	markLabel:SetText("Mark")
+	markLabel:SetText(L["Mark"])
 	f.pills = {}
 	local px = LEFT
 	for i, mark in ipairs(MARKS) do
@@ -543,17 +555,18 @@ local function BuildMarkDialog()
 	-- Note
 	local noteLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	noteLabel:SetPoint("TOPLEFT", 16, -154)
-	noteLabel:SetText("Note")
+	noteLabel:SetText(L["Note"])
 	local noteBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
 	noteBox:SetPoint("TOPLEFT", LEFT, -149)
-	noteBox:SetSize(W - LEFT - RIGHT, 20)
+	noteBox:SetPoint("TOPRIGHT", -RIGHT, -149)
+	noteBox:SetHeight(20)
 	noteBox:SetAutoFocus(false)
 	noteBox:SetFontObject(ChatFontNormal)
 	noteBox:SetMaxLetters(255)
 	f.noteBox = noteBox
 	local noteHint = noteBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	noteHint:SetPoint("LEFT", 2, 0)
-	noteHint:SetText("Optional: shown in their tooltip")
+	noteHint:SetText(L["Optional: shown in their tooltip"])
 	f.noteHint = noteHint
 
 	f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -576,12 +589,12 @@ local function BuildMarkDialog()
 		-- Someone already marked: their current mark is simply shown selected, which says
 		-- so by itself, until you pick another.
 		if e and not f.mark then f.mark, f.autoMark, f.autoKey = e.mark, true, key end
-		f.title:SetText(f.editKey and "Edit mark" or "Manually Mark")
+		f.title:SetText(f.editKey and L["Edit mark"] or L["Manually Mark"])
 		nameHint:SetShown((nameBox:GetText() or "") == "")
 		noteHint:SetShown((noteBox:GetText() or "") == "")
 		for _, p in ipairs(f.pills) do StylePill(p, f.mark == p.mark) end
-		f.status:SetText((key and not e) and "New player" or "")
-		f.save:SetText(e and "Update mark" or "Save mark")
+		f.status:SetText((key and not e) and L["New player"] or "")
+		f.save:SetText(e and L["Update mark"] or L["Save mark"])
 		f.remove:SetShown(e ~= nil)
 	end
 
@@ -601,28 +614,30 @@ local function BuildMarkDialog()
 
 	local function Save()
 		local key = Key()
-		if not key then return Fail("Type a player's name, or press Use target.") end
-		if not f.mark then return Fail("Pick a mark.") end
-		if IsKnownNonPlayer(key) then return Fail(key .. " isn't a player.") end
+		if not key then return Fail(L["Type a player's name, or press Use target."]) end
+		if not f.mark then return Fail(L["Pick a mark."]) end
+		if IsKnownNonPlayer(key) then return Fail(L["%s isn't a player."]:format(key)) end
 		SetMark(key, DisplayName(key), f.mark, f.classHint[key])
 		SetNote(key, noteBox:GetText())
 		f:Hide()
 	end
 	f.Save = Save
 
-	local useTarget = DialogButton(f, "Use target", 86, W - RIGHT - 86, -72, function()
+	local useTarget = DialogButton(f, L["Use target"], 86, function()
 		local key, _, class = KeyFromUnit("target")
 		if not key then key, _, class = KeyFromUnit("mouseover") end
-		if not key then return Fail("Target a player first.") end
+		if not key then return Fail(L["Target a player first."]) end
 		f.classHint[key] = class
 		Load(key)
 	end)
 	useTarget:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Fill the name from your target (or mouseover).", nil, nil, nil, nil, true)
+		GameTooltip:SetText(L["Fill the name from your target (or mouseover)."], nil, nil, nil, nil, true)
 		GameTooltip:Show()
 	end)
 	useTarget:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	useTarget:SetPoint("TOPRIGHT", -RIGHT, -72)
+	nameBox:SetPoint("TOPRIGHT", useTarget, "TOPLEFT", -8, -1)
 
 	nameBox:SetScript("OnTextChanged", function() f.Refresh() end)
 	nameBox:SetScript("OnEnterPressed", function() noteBox:SetFocus() end)
@@ -631,13 +646,28 @@ local function BuildMarkDialog()
 	noteBox:SetScript("OnEnterPressed", Save)
 	noteBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
-	f.remove = DialogButton(f, "Remove", 80, 16, -222, function()
+	f.remove = DialogButton(f, L["Remove"], 80, function()
 		local key = Key()
 		if key and Marks()[key] then RemoveMark(key) end
 		f:Hide()
 	end)
-	DialogButton(f, "Cancel", 74, W - RIGHT - 88 - 6 - 74, -222, function() f:Hide() end)
-	f.save = DialogButton(f, "Save mark", 88, W - RIGHT - 88, -222, Save)
+	f.remove:SetPoint("TOPLEFT", 16, -222)
+	local cancel = DialogButton(f, CANCEL or L["Cancel"], 74, function() f:Hide() end)
+	f.save = DialogButton(f, L["Save mark"], 88, Save)
+	f.save:SetPoint("TOPRIGHT", -RIGHT, -222)
+	cancel:SetPoint("RIGHT", f.save, "LEFT", -6, 0)
+	-- the Save button's label changes (Save mark / Update mark): wide enough for either
+	local saveFs = f.save:GetFontString()
+	local widest = 0
+	for _, text in ipairs({ L["Save mark"], L["Update mark"] }) do
+		f.save:SetText(text)
+		widest = math.max(widest, math.ceil(saveFs and saveFs:GetStringWidth() or 60) + 28)
+	end
+	f.save:SetWidth(math.max(88, widest))
+	-- and the dialog is as wide as its widest row needs
+	local bottom = f.remove:GetWidth() + cancel:GetWidth() + f.save:GetWidth() + 12
+	local top = useTarget:GetWidth() + 8 + 120
+	f:SetWidth(math.max(W, bottom + 32, LEFT + top + RIGHT))
 
 	f.Load = Load
 	f:SetScript("OnShow", function() EscapeList("ThumberFrame", false) end)
@@ -715,17 +745,19 @@ local function GetWindow()
 
 	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -4, -4)
-	HeaderIcon(f, "Interface\\Buttons\\UI-OptionsButton", "Settings",
+	HeaderIcon(f, "Interface\\Buttons\\UI-OptionsButton", L["Settings"],
 		function() if Thumber_OpenSettings then Thumber_OpenSettings() end end, -38)
 
 	local shareBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	shareBtn:SetSize(54, 20)
+	shareBtn:SetHeight(20)
 	shareBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -60, -9)
-	shareBtn:SetText("Share")
+	shareBtn:SetText(L["Share"])
+	local shareFs = shareBtn:GetFontString()
+	shareBtn:SetWidth(math.max(54, math.ceil(shareFs and shareFs:GetStringWidth() or 30) + 24))
 	shareBtn:SetScript("OnClick", function() if ns.OpenShare then ns.OpenShare() end end)
 	shareBtn:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Send your marks to someone, or export and import them.", nil, nil, nil, nil, true)
+		GameTooltip:SetText(L["Send your marks to someone, or export and import them."], nil, nil, nil, nil, true)
 		GameTooltip:Show()
 	end)
 	shareBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -741,14 +773,16 @@ local function GetWindow()
 	-- Toolbar: the one way to add someone by hand
 	----------------------------------------------------------------
 	local markBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	markBtn:SetSize(130, 22)
+	markBtn:SetHeight(22)
 	markBtn:SetPoint("TOPLEFT", 14, -43)
-	markBtn:SetText("Manually Mark")
+	markBtn:SetText(L["Manually Mark"])
+	local markFs = markBtn:GetFontString()
+	markBtn:SetWidth(math.max(130, math.ceil(markFs and markFs:GetStringWidth() or 90) + 28))
 	markBtn:SetScript("OnClick", function() ns.OpenMarkDialog(nil) end)
 	markBtn:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-		GameTooltip:SetText("Manually Mark")
-		GameTooltip:AddLine("Mark someone by typing their name, without targeting them. You can also set their note.", 0.85, 0.85, 0.85, true)
+		GameTooltip:SetText(L["Manually Mark"])
+		GameTooltip:AddLine(L["Mark someone by typing their name, without targeting them. You can also set their note."], 0.85, 0.85, 0.85, true)
 		GameTooltip:Show()
 	end)
 	markBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -767,7 +801,7 @@ local function GetWindow()
 	searchBox:SetFontObject(ChatFontNormal)
 	local hint = searchBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	hint:SetPoint("LEFT", 2, 0)
-	hint:SetText("Search names and notes")
+	hint:SetText(L["Search names and notes"])
 	searchBox:SetScript("OnTextChanged", function(self)
 		local text = self:GetText() or ""
 		hint:SetShown(text == "")
@@ -781,12 +815,17 @@ local function GetWindow()
 	-- One pill per filter, right-aligned: All, thumbs up, neutral, thumbs down.
 	f.pills = {}
 	local PILLS = { { "all", 52 }, { "up", 46 }, { "neutral", 46 }, { "down", 46 } }
-	local x = -14
+	local probe = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	local prev, pillsWidth = nil, 0
 	for i = #PILLS, 1, -1 do
 		local key, w = PILLS[i][1], PILLS[i][2]
+		probe:SetText(key == "all" and L["All %d"]:format(999) or (MarkIcon(key) .. " 999"))
+		w = math.max(w, math.ceil(probe:GetStringWidth() or 30) + 14)
+		pillsWidth = pillsWidth + w + (prev and 4 or 0)
 		local p = CreateFrame("Button", nil, f, "BackdropTemplate")
 		p:SetSize(w, 20)
-		p:SetPoint("TOPRIGHT", x, -44)
+		if prev then p:SetPoint("RIGHT", prev, "LEFT", -4, 0) else p:SetPoint("TOPRIGHT", -14, -44) end
+		prev = p
 		p:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
 		p:SetBackdropColor(0.055, 0.047, 0.035, 0.8)
 		p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -794,8 +833,9 @@ local function GetWindow()
 		p.key = key
 		p:SetScript("OnClick", function() f.filter = key; RefreshList() end)
 		f.pills[i] = p
-		x = x - w - 4
 	end
+	probe:Hide()
+	f:SetWidth(math.max(400, 14 + markBtn:GetWidth() + 16 + pillsWidth + 14))
 
 	----------------------------------------------------------------
 	-- Scrollable list
@@ -860,25 +900,27 @@ local function GetWindow()
 
 	local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	empty:SetPoint("TOPLEFT", 18, -108)
-	empty:SetText("No marked players yet. Press Manually Mark, or target someone")
-	local empty2 = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	empty2:SetPoint("TOPLEFT", 18, -122)
-	empty2:SetText("and use /thumbsup | /thumbsdown | /neutral, or the arrow keys.")
-	f.empty, f.empty2 = empty, empty2
-	f.emptyText = { empty:GetText(), empty2:GetText() }
+	empty:SetPoint("TOPRIGHT", -18, -108)
+	empty:SetJustifyH("LEFT")
+	empty:SetText(L["No marked players yet. Press Manually Mark, or target someone and use /thumbsup | /thumbsdown | /neutral, or the arrow keys."])
+	f.empty = empty
+	f.emptyText = empty:GetText()
+
+	local clearBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	clearBtn:SetHeight(20)
+	clearBtn:SetPoint("BOTTOMRIGHT", -14, 8)
+	clearBtn:SetWidth(160)
 
 	local tip = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	tip:SetPoint("BOTTOMLEFT", 16, 12)
-	tip:SetText("Click a player to edit them.")
-
-	local clearBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	clearBtn:SetSize(160, 20)
-	clearBtn:SetPoint("BOTTOMRIGHT", -14, 8)
+	tip:SetPoint("RIGHT", clearBtn, "LEFT", -8, 0)
+	tip:SetJustifyH("LEFT")
+	tip:SetText(L["Click a player to edit them."])
 	clearBtn:SetScript("OnClick", ClearClick)
 	clearBtn:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Clear marks")
-		GameTooltip:AddLine("Removes every mark the list is showing; the filter and the search both apply. Click twice to confirm. Afterwards an Undo button is offered for " .. UNDO_FOR .. " seconds.", 0.85, 0.85, 0.85, true)
+		GameTooltip:SetText(L["Clear marks"])
+		GameTooltip:AddLine(L["Removes every mark the list is showing; the filter and the search both apply. Click twice to confirm. Afterwards an Undo button is offered for %d seconds."]:format(UNDO_FOR), 0.85, 0.85, 0.85, true)
 		GameTooltip:Show()
 	end)
 	clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -908,7 +950,7 @@ local function GetRow(i)
 	r.del:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
 	r.del:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Remove this mark")
+		GameTooltip:SetText(L["Remove this mark"])
 		GameTooltip:Show()
 	end)
 	r.del:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -918,7 +960,7 @@ local function GetRow(i)
 
 	r.time = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	r.time:SetPoint("RIGHT", r.del, "LEFT", -6, 0)
-	r.time:SetWidth(58)
+	r.time:SetWidth(74)
 	r.time:SetJustifyH("RIGHT")
 
 	r.text = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -948,11 +990,21 @@ local function GetRow(i)
 		GameTooltip:AddLine(MarkIcon(e.mark) .. " |cff" .. MarkHex(e.mark) .. info.label .. "|r")
 		if e.note then GameTooltip:AddLine("\"" .. e.note .. "\"", 0.85, 0.85, 0.85, true) end
 		if e.lastSeen then
-			GameTooltip:AddLine(("Last seen %s%s%s"):format(Ago(e.lastSeen),
-				e.zone and (" in " .. e.zone) or "", e.level and (", level " .. e.level) or ""), 0.6, 0.55, 0.43, true)
+			-- whole sentences, one per combination, so each language can order them its own way
+			local ago, line = Ago(e.lastSeen)
+			if e.zone and e.level then
+				line = L["Last seen %s in %s, level %d"]:format(ago, e.zone, e.level)
+			elseif e.zone then
+				line = L["Last seen %s in %s"]:format(ago, e.zone)
+			elseif e.level then
+				line = L["Last seen %s, level %d"]:format(ago, e.level)
+			else
+				line = L["Last seen %s"]:format(ago)
+			end
+			GameTooltip:AddLine(line, 0.6, 0.55, 0.43, true)
 		end
 		if e.time then
-			GameTooltip:AddLine("Marked " .. date("%Y-%m-%d", e.time), 0.6, 0.55, 0.43)
+			GameTooltip:AddLine(L["Marked %s"]:format(date("%Y-%m-%d", e.time)), 0.6, 0.55, 0.43)
 		end
 		GameTooltip:Show()
 	end)
@@ -967,7 +1019,6 @@ function RefreshList()
 	if not win or not win:IsShown() then return end
 	local list = SortedMarks(win.filter, win.search)
 	win.empty:SetShown(#list == 0)
-	win.empty2:SetShown(#list == 0)
 
 	-- Counts for the filter pills, and which pill is active.
 	local counts = { all = 0, up = 0, neutral = 0, down = 0 }
@@ -977,16 +1028,16 @@ function RefreshList()
 	end
 	for _, p in ipairs(win.pills) do
 		local active = win.filter == p.key
-		local label = p.key == "all" and ("All " .. counts.all) or (MarkIcon(p.key) .. " " .. (counts[p.key] or 0))
+		local label = p.key == "all" and L["All %d"]:format(counts.all) or (MarkIcon(p.key) .. " " .. (counts[p.key] or 0))
 		p.text:SetText(label)
 		p.text:SetTextColor(active and 1 or 0.7, active and 0.82 or 0.65, active and 0 or 0.5)
 		local c = active and BRONZE or { 0.23, 0.18, 0.11 }
 		p:SetBackdropBorderColor(c[1], c[2], c[3], 1)
 	end
 	if counts.all == 0 then
-		win.empty:SetText(win.emptyText[1]); win.empty2:SetText(win.emptyText[2])
+		win.empty:SetText(win.emptyText)
 	else
-		win.empty:SetText("No marks match your search or filter."); win.empty2:SetText("")
+		win.empty:SetText(L["No marks match your search or filter."])
 	end
 
 	-- The player being edited in the dialog, to highlight their row.
@@ -1136,19 +1187,18 @@ function Thumber_QuickMark(mark)
 	local key, name, class = KeyFromUnit("target")
 	if not key then key, name, class = KeyFromUnit("mouseover") end
 	if not key then
-		UIErrorsFrame:AddMessage("Thumber: no player targeted.", 1, 0.4, 0.4)
+		UIErrorsFrame:AddMessage(L["Thumber: no player targeted."], 1, 0.4, 0.4)
 		return
 	end
 	local info = MARK[mark] or MARK.neutral
 	local result = ToggleMark(key, name, mark, class)
 	if ns.OnQuickMark then ns.OnQuickMark(key, result, mark) end
 	if not chat then return end
+	local shown = "|cff" .. MarkHex(mark) .. info.label .. "|r"
 	if result == "removed" then
-		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
-			" un-marked (was |cff" .. MarkHex(mark) .. info.label .. "|r).")
+		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. L["%s un-marked (was %s)."]:format(name, shown))
 	else
-		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. name ..
-			" marked |cff" .. MarkHex(mark) .. info.label .. "|r.")
+		DEFAULT_CHAT_FRAME:AddMessage(MarkIcon(mark) .. " Thumber: " .. L["%s marked %s."]:format(name, shown))
 	end
 end
 
@@ -1175,8 +1225,8 @@ local function EnsureBroker()
 		end,
 		OnTooltipShow = function(tt)
 			tt:AddLine("Thumber")
-			tt:AddLine("Left-click: open the marks list", 0.9, 0.9, 0.9)
-			tt:AddLine("Right-click: settings", 0.9, 0.9, 0.9)
+			tt:AddLine(L["Left-click: open the marks list"], 0.9, 0.9, 0.9)
+			tt:AddLine(L["Right-click: settings"], 0.9, 0.9, 0.9)
 		end,
 	})
 	return ldbObject
@@ -1219,10 +1269,10 @@ SlashCmdList.THUMBER = function(msg)
 	elseif cmd == "note" then
 		local key, name, class = KeyFromUnit("target")
 		if not key then key, name, class = KeyFromUnit("mouseover") end
-		if not key then Print("note who? target a player, then /thumber note <text>."); return end
+		if not key then Print(L["note who? target a player, then /thumber note <text>."]); return end
 		if class then SetMark(key, name, (Marks()[key] and Marks()[key].mark) or "neutral", class) end
 		SetNote(key, rest)
-		Print(name .. "'s note set.")
+		Print(L["%s's note set."]:format(name))
 	elseif cmd == "config" or cmd == "options" then
 		if Thumber_OpenSettings then Thumber_OpenSettings() end
 	elseif cmd == "share" or cmd == "export" or cmd == "import" then
@@ -1231,28 +1281,28 @@ SlashCmdList.THUMBER = function(msg)
 		if ns.OpenProfile then ns.OpenProfile() end
 	elseif cmd == "send" then
 		local ok, err = ns.SendMarks(rest)
-		Print(ok and ("offering your marks to " .. rest .. ".") or err)
+		Print(ok and L["offering your marks to %s."]:format(rest) or err)
 	elseif cmd == "test" then
 		if ns.TestAlert then ns.TestAlert() end
 	elseif cmd == "resetbinds" or cmd == "bindreset" then
 		local ok, count = ApplyDefaultBindings(true)
 		if not ok then
-			Print("can't change keybinds in combat — try again after combat.")
+			Print(L["can't change keybinds in combat — try again after combat."])
 		else
-			Print(("arrow-key defaults applied (%d set). Up=thumbs up, Down=thumbs down, Left=neutral, Right=list.")
+			Print(L["arrow-key defaults applied (%d set). Up=thumbs up, Down=thumbs down, Left=neutral, Right=list."]
 				:format(count or 0))
 		end
 	else
-		Print("commands:")
-		Print("  /thumbsup (/tu) | /thumbsdown (/td) | /neutral (/nt) [note] — mark your target")
-		Print("  /thumber (/th) — open the marks list")
-		Print("  /thumber note <text> — set a note on your target")
-		Print("  /thumber config — settings & keybinds")
-		Print("  /thumber resetbinds — re-apply the arrow-key defaults")
-		Print("  /thumber test — preview the group-join alert")
-		Print("  /thumber share — export, import, or send your marks")
-		Print("  /thumber profile — export or import all your settings, positions and keybinds")
-		Print("  /thumber send <player> — offer your marks to a player")
+		Print(L["commands:"])
+		Print("  " .. L["/thumbsup (/tu) | /thumbsdown (/td) | /neutral (/nt) [note] — mark your target"])
+		Print("  " .. L["/thumber (/th) — open the marks list"])
+		Print("  " .. L["/thumber note <text> — set a note on your target"])
+		Print("  " .. L["/thumber config — settings & keybinds"])
+		Print("  " .. L["/thumber resetbinds — re-apply the arrow-key defaults"])
+		Print("  " .. L["/thumber test — preview the group-join alert"])
+		Print("  " .. L["/thumber share — export, import, or send your marks"])
+		Print("  " .. L["/thumber profile — export or import all your settings, positions and keybinds"])
+		Print("  " .. L["/thumber send <player> — offer your marks to a player"])
 	end
 end
 
@@ -1271,24 +1321,25 @@ local function MarkTargetWithNote(mark, msg)
 	local key, name, class = KeyFromUnit("target")
 	if not key then key, name, class = KeyFromUnit("mouseover") end
 	if not key then
-		Print("no player targeted — target someone, then /" ..
-			(mark == "up" and "tu" or mark == "down" and "td" or "neutral") .. " [note].")
+		Print(L["no player targeted — target someone, then /%s [note]."]:format(
+			mark == "up" and "tu" or mark == "down" and "td" or "neutral"))
 		return
 	end
 	local info = MARK[mark] or MARK.neutral
+	local shown = "|cff" .. MarkHex(mark) .. info.label .. "|r"
 	-- With no note, pressing the mark a player already has toggles it off.
 	if arg == "" then
 		if ToggleMark(key, name, mark, class) == "removed" then
-			Print(MarkIcon(mark) .. " " .. name .. " un-marked (was |cff" .. MarkHex(mark) .. info.label .. "|r).")
+			Print(MarkIcon(mark) .. " " .. L["%s un-marked (was %s)."]:format(name, shown))
 		else
-			Print(MarkIcon(mark) .. " " .. name .. " marked |cff" .. MarkHex(mark) .. info.label .. "|r.")
+			Print(MarkIcon(mark) .. " " .. L["%s marked %s."]:format(name, shown))
 		end
 		return
 	end
 	-- A supplied note always sets/updates (never removes).
 	SetMark(key, name, mark, class)
 	SetNote(key, arg)
-	Print(MarkIcon(mark) .. " " .. name .. " marked |cff" .. MarkHex(mark) .. info.label .. "|r — \"" .. arg .. "\".")
+	Print(MarkIcon(mark) .. " " .. L["%s marked %s — \"%s\"."]:format(name, shown, arg))
 end
 
 SLASH_THUMBERUP1 = "/thumbsup"

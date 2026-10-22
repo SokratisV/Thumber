@@ -11,6 +11,7 @@
 -- and anything else is ignored and counted rather than applied.
 
 local ADDON, ns = ...
+local L = ns.L
 
 local DB = ns.DB
 local TAG, VERSION = "THUMBERPROFILE", 1
@@ -109,7 +110,7 @@ local function BuildLines()
 	if type(pos) == "table" and IsFinite(pos[1]) and IsFinite(pos[2]) then
 		lines[#lines + 1] = "pos\t1\tn\t" .. FormatNumber(pos[1])
 		lines[#lines + 1] = "pos\t2\tn\t" .. FormatNumber(pos[2])
-		info.positions[#info.positions + 1] = "marks window"
+		info.positions[#info.positions + 1] = L["marks window"]
 	end
 
 	local ap = db.alertPos
@@ -118,7 +119,7 @@ local function BuildLines()
 		lines[#lines + 1] = "alertPos\t2\ts\t" .. Esc(type(ap[2]) == "string" and ap[2] or ap[1])
 		lines[#lines + 1] = "alertPos\t3\tn\t" .. FormatNumber(ap[3])
 		lines[#lines + 1] = "alertPos\t4\tn\t" .. FormatNumber(IsFinite(ap[4]) and ap[4] or 0)
-		info.positions[#info.positions + 1] = "alert"
+		info.positions[#info.positions + 1] = L["alert"]
 	end
 
 	local mm = db.minimap
@@ -136,7 +137,7 @@ local function BuildLines()
 				any = true
 			end
 		end
-		if any then info.positions[#info.positions + 1] = "minimap button" end
+		if any then info.positions[#info.positions + 1] = L["minimap button"] end
 	end
 
 	if type(db.optionsPage) == "string" then
@@ -167,22 +168,22 @@ end
 -- A parsed profile, or nil and a reason. Nothing is applied here.
 local function Parse(text)
 	text = (text or ""):gsub("%s+", "")
-	if text == "" then return nil, "Paste a profile string first." end
-	if #text > MAX_TEXT then return nil, "That text is far too long to be a Thumber profile." end
+	if text == "" then return nil, L["Paste a profile string first."] end
+	if #text > MAX_TEXT then return nil, L["That text is far too long to be a Thumber profile."] end
 	if text:match("^THUMBER:") then
-		return nil, "That is a marks export. Use Share > Import for marks; this window is for settings."
+		return nil, L["That is a marks export. Use Share > Import for marks; this window is for settings."]
 	end
 	local version, body = text:match("^" .. TAG .. ":(%d+):(.+)$")
-	if not version then return nil, "That doesn't look like a Thumber profile." end
+	if not version then return nil, L["That doesn't look like a Thumber profile."] end
 	if tonumber(version) ~= VERSION then
-		return nil, "This profile was made by a different version of Thumber (format " .. version .. ")."
+		return nil, L["This profile was made by a different version of Thumber (format %s)."]:format(version)
 	end
 	local raw = ns.Share.B64Decode(body)
-	if not raw then return nil, "The text is damaged. Copy the whole string again." end
+	if not raw then return nil, L["The text is damaged. Copy the whole string again."] end
 
 	local lines = Split(raw, "\n")
-	if #lines > MAX_LINES then return nil, "That profile is far bigger than Thumber ever writes." end
-	if lines[1] ~= TAG .. " " .. VERSION then return nil, "That profile's contents are not recognised." end
+	if #lines > MAX_LINES then return nil, L["That profile is far bigger than Thumber ever writes."] end
+	if lines[1] ~= TAG .. " " .. VERSION then return nil, L["That profile's contents are not recognised."] end
 
 	local rules = ns.OptionRules()
 	local p = { options = {}, ignored = 0, from = "?" }
@@ -274,9 +275,9 @@ local function Parse(text)
 	for _ in pairs(p.options) do n = n + 1 end
 	p.count = n
 	p.where = {}
-	if p.pos then p.where[#p.where + 1] = "marks window" end
-	if p.alertPos then p.where[#p.where + 1] = "alert" end
-	if p.minimap and (p.minimap.minimapPos or p.minimap.hide ~= nil) then p.where[#p.where + 1] = "minimap button" end
+	if p.pos then p.where[#p.where + 1] = L["marks window"] end
+	if p.alertPos then p.where[#p.where + 1] = L["alert"] end
+	if p.minimap and (p.minimap.minimapPos or p.minimap.hide ~= nil) then p.where[#p.where + 1] = L["minimap button"] end
 	p.keyCount = 0
 	for _, list in pairs(keys or {}) do p.keyCount = p.keyCount + #list end
 	return p
@@ -343,10 +344,10 @@ local BRONZE_MUTED = { 0.61, 0.48, 0.29 }
 local dlg
 
 local function Describe(count, where, keyCount)
-	local parts = { count .. (count == 1 and " setting" or " settings") }
-	if #where > 0 then parts[#parts + 1] = "positions (" .. table.concat(where, ", ") .. ")" end
-	if keyCount and keyCount > 0 then parts[#parts + 1] = keyCount .. (keyCount == 1 and " keybind" or " keybinds") end
-	return table.concat(parts, ", ")
+	local parts = { L["Settings: %d"]:format(count) }
+	if #where > 0 then parts[#parts + 1] = L["Positions: %s"]:format(table.concat(where, ", ")) end
+	if keyCount and keyCount > 0 then parts[#parts + 1] = L["Keybinds: %d"]:format(keyCount) end
+	return table.concat(parts, "; ")
 end
 
 local function BuildDialog()
@@ -375,7 +376,7 @@ local function BuildDialog()
 
 	local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 16, -12)
-	title:SetText("Profile")
+	title:SetText(L["Profile"])
 	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -4, -4)
 	local rule = f:CreateTexture(nil, "ARTWORK")
@@ -389,13 +390,16 @@ local function BuildDialog()
 	hint:SetPoint("TOPRIGHT", -16, -44)
 	hint:SetJustifyH("LEFT")
 	hint:SetHeight(30)
-	hint:SetText("All of Thumber's settings, positions and keybinds as one string, to move to another character or install, or to keep as a backup. Your marks are not included.")
+	hint:SetText(L["All of Thumber's settings, positions and keybinds as one string, to move to another character or install, or to keep as a backup. Your marks are not included."])
 
 	local eb
 	local ok, sf = pcall(CreateFrame, "ScrollFrame", nil, f, "InputScrollFrameTemplate")
 	if ok and sf and sf.EditBox then
 		sf:SetPoint("TOPLEFT", 16, -86)
-		sf:SetSize(410, 130)
+		sf:SetPoint("TOPRIGHT", -16, -86)
+		sf:SetHeight(130)
+		-- the edit box follows the window's width, which grows with the buttons below
+		sf:HookScript("OnSizeChanged", function(self, w) eb:SetWidth(math.max(50, (w or 410) - 20)) end)
 		if sf.CharCount then sf.CharCount:Hide() end
 		eb = sf.EditBox
 		eb:SetWidth(390)
@@ -403,7 +407,8 @@ local function BuildDialog()
 	else
 		eb = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
 		eb:SetPoint("TOPLEFT", 22, -86)
-		eb:SetSize(400, 130)
+		eb:SetPoint("TOPRIGHT", -22, -86)
+		eb:SetHeight(130)
 		eb:SetMultiLine(true)
 	end
 	eb:SetFontObject(ChatFontNormal)
@@ -418,11 +423,19 @@ local function BuildDialog()
 	summary:SetHeight(32)
 	f.summary = summary
 
-	local function Button(text, w, x, y, onClick)
+	-- The buttons sit in one row, each as wide as its own text needs, and the window
+	-- widens to hold the row (German and Russian run much longer than English).
+	local rowPrev, rowWidth = nil, 0
+	local function Button(text, minWidth, onClick)
 		local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-		b:SetSize(w, 22)
-		b:SetPoint("TOPLEFT", x, y)
+		b:SetHeight(22)
 		b:SetText(text)
+		local fs = b:GetFontString()
+		local w = math.max(minWidth, math.ceil(fs and fs:GetStringWidth() or 60) + 28)
+		b:SetWidth(w)
+		if rowPrev then b:SetPoint("LEFT", rowPrev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", 16, -280) end
+		rowWidth = rowWidth + w + (rowPrev and 6 or 0)
+		rowPrev = b
 		b:SetScript("OnClick", onClick)
 		return b
 	end
@@ -432,44 +445,45 @@ local function BuildDialog()
 		f.apply:Hide()
 	end
 
-	Button("Export profile", 100, 16, -280, function()
+	Button(L["Export profile"], 100, function()
 		ClearParsed()
 		local text, info = Export()
 		eb:SetText(text)
 		eb:HighlightText()
 		eb:SetFocus()
-		summary:SetText(("Exported %s. Press Ctrl+C to copy it, then paste it wherever you like."):format(
+		summary:SetText(L["Exported (%s). Press Ctrl+C to copy it, then paste it wherever you like."]:format(
 			Describe(info.settings, info.positions, info.keys)))
 	end)
-	Button("Check pasted profile", 140, 120, -280, function()
+	Button(L["Check pasted profile"], 140, function()
 		ClearParsed()
 		local p, err = Parse(eb:GetText())
 		if not p then summary:SetText("|cffff6060" .. err .. "|r") return end
 		f.parsed = p
-		local text = ("Made with Thumber %s. It holds %s."):format(p.from, Describe(p.count, p.where, p.keyCount))
-		if p.ignored > 0 then text = text .. (" (%d entries were not recognised and will be skipped.)"):format(p.ignored) end
-		summary:SetText(text .. " Applying it replaces your current settings.")
+		local text = L["Made with Thumber %s. It holds: %s."]:format(p.from, Describe(p.count, p.where, p.keyCount))
+		if p.ignored > 0 then text = text .. " " .. L["(%d entries were not recognised and will be skipped.)"]:format(p.ignored) end
+		summary:SetText(text .. " " .. L["Applying it replaces your current settings."])
 		f.apply:Show()
 	end)
-	Button("Clear box", 66, 264, -280, function()
+	Button(L["Clear box"], 66, function()
 		eb:SetText("")
 		ClearParsed()
 		summary:SetText("")
 	end)
-	f.apply = Button("Apply profile", 100, 334, -280, function()
+	f.apply = Button(L["Apply profile"], 100, function()
 		local p = f.parsed
 		if not p then return end
 		local keysResult = Apply(p)
 		f.parsed = nil
 		f.apply:Hide()
-		local text = "Profile applied."
+		local text = L["Profile applied."]
 		if keysResult == "combat" then
-			text = text .. " Keybinds were left as they are, because you are in combat: apply it again after combat."
+			text = text .. " " .. L["Keybinds were left as they are, because you are in combat: apply it again after combat."]
 		end
 		summary:SetText(text)
 		Print(text)
 	end)
 	f.apply:Hide()
+	f:SetWidth(math.max(460, rowWidth + 32))
 	f:Hide()
 	return f
 end

@@ -170,6 +170,18 @@ defaults and then sets what it contains, so the result is the same setup, and it
 redraws on the spot: no reload. Keybinds are left alone if you are in combat (apply it
 again afterwards). Your **marks** are never touched; share those with **Share**.
 
+## Languages
+
+Thumber follows the game's language: English, Deutsch, Français, Español (España and
+México), Português (Brasil), Русский, 한국어, 简体中文, 繁體中文 and Italiano. Anything
+without a translation shows in English. The translations live in `Locales/`, one file per
+language (`L["English text"] = "translation"`), so a correction is a one-line edit. They were
+written without a native-speaker review, so wording fixes are welcome.
+
+What is *not* translated on purpose: the slash words (`/thumbsup`, `/thumber share`, ...),
+the saved-data keys, and the share and profile strings, so a mark list or profile exported
+in one language imports fine in another.
+
 ## Data
 
 Everything is stored locally in `ThumberDB` (per account). Cross-realm

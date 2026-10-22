@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 -- The settings window (/thumber config), in the visual language of FlareUI by Malkkav
 -- (MIT), as the Garu Combat Text and Unbuffed windows are: bronze trim over Blizzard's
@@ -110,12 +111,12 @@ local function ShowInfo(title, desc, tip)
 	if not info.title then return end
 	info.title:SetText(title or "")
 	info.desc:SetText(desc or "")
-	info.tip:SetText(tip and ("|cffffd100Tip:|r " .. tip) or "")
+	info.tip:SetText(tip and ("|cffffd100" .. L["Tip:"] .. "|r " .. tip) or "")
 end
 
 local function ShowPageInfo()
 	local p = pageByKey and pageByKey[current]
-	if p then ShowInfo(val(p.title), val(p.desc), "Hover any setting to see what it does.") end
+	if p then ShowInfo(val(p.title), val(p.desc), L["Hover any setting to see what it does."]) end
 end
 
 --------------------------------------------------------------------------
@@ -400,7 +401,7 @@ Build.bind = function(f)
 		if b.listening then return end
 		local act = action()
 		local k = act and GetBindingKey(act)
-		b:SetText(k and ("|cff00ff00" .. k .. "|r") or "Click to set key")
+		b:SetText(k and ("|cff00ff00" .. k .. "|r") or L["Click to set key"])
 	end
 	b.refresh = refresh
 
@@ -431,7 +432,7 @@ Build.bind = function(f)
 		if InCombatLockdown() then return end
 		self.listening = true
 		Thumber_CapturingKey = true
-		self:SetText("Press a key\226\128\166 (Esc cancels)")
+		self:SetText(L["Press a key… (Esc cancels)"])
 		self:EnableKeyboard(true)
 		self:SetPropagateKeyboardInput(false) -- consume keys only while capturing
 	end)
@@ -476,10 +477,20 @@ Fill.bind = function(f)
 	f.bindButton.refresh()
 end
 
+-- What the control at the right of a row leaves for the label, which wraps to a second
+-- line (and the row grows) when a translation is longer than English.
+local LABEL_ROOM = { toggle = 50, choice = 250, slider = 262, bind = 214 }
+local ROW_BASE = { choice = ROW_H + 6, slider = ROW_H + 4 }
 local function FillRow(f, row)
 	f.row = row
 	f.label:SetText(val(row.label) or "")
 	Fill[f.kind](f, row)
+	local room = LABEL_ROOM[f.kind]
+	if f.kind == "button" then room = (f.button:GetWidth() or 120) + 24 end
+	f.label:SetWidth(CONTENT_W - 6 - (room or 50))
+	f.label:SetWordWrap(true)
+	local lines = math.ceil((f.label:GetStringHeight() or 14) / 14)
+	f:SetHeight(math.max(ROW_BASE[f.kind] or ROW_H, lines > 1 and (lines * 14 + 12) or 0))
 end
 
 --------------------------------------------------------------------------
@@ -520,6 +531,8 @@ local function HeaderButton(parent, text, w, onClick)
 	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
 	b:SetSize(w, 22)
 	b:SetText(text)
+	local fs = b:GetFontString()
+	b:SetWidth(math.max(w, math.ceil(fs and fs:GetStringWidth() or 40) + 28))
 	b:SetScript("OnClick", function() Sound("IG_MAINMENU_OPTION_CHECKBOX_ON"); onClick() end)
 	return b
 end
@@ -541,7 +554,7 @@ local function BuildPreview(parent, header)
 	bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT")
 	local label = Text(box, "GameFontDisableSmall")
 	label:SetPoint("TOPLEFT", 6, -5)
-	label:SetText("Preview")
+	label:SetText(L["Preview"])
 	pv.box = box
 
 	-- which mark the preview shows, and the replays
@@ -554,27 +567,27 @@ local function BuildPreview(parent, header)
 	pv.markBtn:SetHeight(20)
 	pv.markBtn:SetPoint("TOPRIGHT", -6, -3)
 	pv.markBtn:SetScript("OnEnter", function()
-		ShowInfo("Preview as", "Switches the preview between the three marks: thumbs up, neutral and thumbs down.",
-			"Nothing is marked; this only changes the preview.")
+		ShowInfo(L["Preview as"], L["Switches the preview between the three marks: thumbs up, neutral and thumbs down."],
+			L["Nothing is marked; this only changes the preview."])
 	end)
 	pv.markBtn:SetScript("OnLeave", ShowPageInfo)
 
-	pv.popBtn = HeaderButton(box, "Replay pop", 90, function()
+	pv.popBtn = HeaderButton(box, L["Replay pop"], 90, function()
 		if ns.Opt("popAnim") and pv.targetBadge:IsShown() then ns.PopBadge(pv.targetBadge) end
 	end)
 	pv.popBtn:SetHeight(20)
 	pv.popBtn:SetPoint("RIGHT", pv.markBtn, "LEFT", -4, 0)
 	pv.popBtn:SetScript("OnEnter", function()
-		ShowInfo("Replay pop", "Plays the animation the target badge makes when a keybind marks your target.", "Needs Pop animation on.")
+		ShowInfo(L["Replay pop"], L["Plays the animation the target badge makes when a keybind marks your target."], L["Needs Pop animation on."])
 	end)
 	pv.popBtn:SetScript("OnLeave", ShowPageInfo)
 
-	pv.alertBtn = HeaderButton(box, "Show real alert", 120, function() if ns.TestAlert then ns.TestAlert() end end)
+	pv.alertBtn = HeaderButton(box, L["Show real alert"], 120, function() if ns.TestAlert then ns.TestAlert() end end)
 	pv.alertBtn:SetHeight(20)
 	pv.alertBtn:SetPoint("RIGHT", pv.markBtn, "LEFT", -4, 0)
 	pv.alertBtn:SetScript("OnEnter", function()
-		ShowInfo("Show real alert", "Pops the actual group alert on your screen, with its sound, exactly as it appears when a marked player is in your group.",
-			"Also /thumber test.")
+		ShowInfo(L["Show real alert"], L["Pops the actual group alert on your screen, with its sound, exactly as it appears when a marked player is in your group."],
+			L["Also /thumber test."])
 	end)
 	pv.alertBtn:SetScript("OnLeave", ShowPageInfo)
 
@@ -600,7 +613,7 @@ local function BuildPreview(parent, header)
 	local plvlText = plvl:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	plvlText:SetPoint("CENTER")
 	plvlText:SetText("60")
-	SceneLabel(plate, "Nameplate")
+	SceneLabel(plate, L["Nameplate"])
 	pv.plate = { plate = plate, name = pname, bar = pbar, level = plvl }
 	pv.plateBadge = ns.NewBadge(plate)
 
@@ -624,7 +637,7 @@ local function BuildPreview(parent, header)
 	tname:SetText("|cffff7d0aKhalitas|r")
 	local tbar = MockBar(tgt, 80, 10, 0.2, 0.7, 0.25)
 	tbar:SetPoint("TOPLEFT", tname, "BOTTOMLEFT", 0, -3)
-	SceneLabel(tgt, "Target frame")
+	SceneLabel(tgt, L["Target frame"])
 	pv.port = port
 	pv.targetBadge = ns.NewBadge(tgt)
 
@@ -651,7 +664,7 @@ local function BuildPreview(parent, header)
 	pv.toastIcon:SetPoint("LEFT", 14, 0)
 	local ttitle = toast:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	ttitle:SetPoint("TOPLEFT", pv.toastIcon, "TOPRIGHT", 10, 2)
-	ttitle:SetText("Marked player in your group")
+	ttitle:SetText(L["Marked player in your group"])
 	pv.toastName = toast:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	pv.toastName:SetPoint("TOPLEFT", ttitle, "BOTTOMLEFT", 0, -3)
 	pv.toastNote = toast:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -661,7 +674,7 @@ local function BuildPreview(parent, header)
 		if not pv.box then return end
 		local mark = MARK[pv.mark] or MARK.neutral
 		local size = ns.Opt("badgeSize")
-		pv.markBtn:SetText("Preview as: " .. mark.label)
+		pv.markBtn:SetText(L["Preview as: %s"]:format(mark.label))
 		FitButton(pv.markBtn, 120)
 		pv.A:SetShown(pv.scene == "badges")
 		pv.B:SetShown(pv.scene == "alert")
@@ -683,18 +696,19 @@ local function BuildPreview(parent, header)
 			else
 				ns.HideBadge(pv.targetBadge)
 			end
-			pv.chat1:SetText("|cffaaaaff[Party]|r |cffff7d0a[Khalitas Shadowclaw]|r: " ..
-				(ns.Opt("badgeChat") and (ns.MarkIcon(pv.mark) .. " ") or "") .. "pull now")
+			pv.chat1:SetText("|cffaaaaff[" .. (PARTY or "Party") .. "]|r |cffff7d0a[Khalitas Shadowclaw]|r: " ..
+				(ns.Opt("badgeChat") and (ns.MarkIcon(pv.mark) .. " ") or "") .. L["pull now"])
 			if ns.Opt("chatLogging") then
-				pv.chat2:SetText(ns.MarkIcon(pv.mark) .. " |cff66ccffThumber|r: Khalitas Shadowclaw marked |cff" .. mark.hex .. mark.label .. "|r.")
+				pv.chat2:SetText(ns.MarkIcon(pv.mark) .. " |cff66ccffThumber|r: " ..
+					L["%s marked %s."]:format("Khalitas Shadowclaw", "|cff" .. mark.hex .. mark.label .. "|r"))
 			else
-				pv.chat2:SetText("|cff777777(no chat message when a keybind marks someone)|r")
+				pv.chat2:SetText("|cff777777" .. L["(no chat message when a keybind marks someone)"] .. "|r")
 			end
 		else
 			pv.toastIcon:SetTexture(mark.tex)
 			pv.toast:SetBackdropBorderColor(mark.color[1], mark.color[2], mark.color[3], 1)
 			pv.toastName:SetText("|cffff7d0aKhalitas Shadowclaw|r  |cff9a8b6e" .. mark.label .. "|r")
-			pv.toastNote:SetText("\"ninja looted last run\"")
+			pv.toastNote:SetText("\"" .. L["ninja looted last run"] .. "\"")
 			pv.toast:SetAlpha(ns.Opt("groupAlert") and 1 or 0.3)
 		end
 	end
@@ -707,14 +721,14 @@ ns.OnOptionChanged = function() if pv.update then pv.update() end end
 --------------------------------------------------------------------------
 -- 6. PAGES
 --------------------------------------------------------------------------
-local STYLES = { { value = "icon", text = "Icon" }, { value = "ring", text = "Ring" } }
+local STYLES = { { value = "icon", text = L["Icon"] }, { value = "ring", text = L["Ring"] } }
 local ANCHORS = {
-	{ value = "ABOVE", text = "Above the nameplate" }, { value = "BELOW", text = "Below the nameplate" },
-	{ value = "LEFT", text = "Left of the nameplate" }, { value = "RIGHT", text = "Right of the nameplate" },
+	{ value = "ABOVE", text = L["Above the nameplate"] }, { value = "BELOW", text = L["Below the nameplate"] },
+	{ value = "LEFT", text = L["Left of the nameplate"] }, { value = "RIGHT", text = L["Right of the nameplate"] },
 }
 local CORNERS = {
-	{ value = "TOPRIGHT", text = "Top right" }, { value = "TOPLEFT", text = "Top left" },
-	{ value = "BOTTOMRIGHT", text = "Bottom right" }, { value = "BOTTOMLEFT", text = "Bottom left" },
+	{ value = "TOPRIGHT", text = L["Top right"] }, { value = "TOPLEFT", text = L["Top left"] },
+	{ value = "BOTTOMRIGHT", text = L["Bottom right"] }, { value = "BOTTOMLEFT", text = L["Bottom left"] },
 }
 
 local function definePages()
@@ -722,7 +736,7 @@ local function definePages()
 
 	-- Two clicks rather than a dialog: the first arms the button and says so, and it
 	-- disarms itself if the second never comes.
-	local RESET_LABEL = "Reset badge look"
+	local RESET_LABEL = L["Reset badge look"]
 	local confirming, armed = false, 0
 	local function resetClick()
 		if confirming then
@@ -745,29 +759,29 @@ local function definePages()
 
 	pages = {
 		{
-			key = "general", title = "General",
-			desc = "What Thumber shows in tooltips and chat, and the minimap button. Marks themselves are made with the keybinds, the slash commands, or the marks window.",
+			key = "general", title = L["General"],
+			desc = L["What Thumber shows in tooltips and chat, and the minimap button. Marks themselves are made with the keybinds, the slash commands, or the marks window."],
 			sections = {
-				{ key = "tooltips", title = "Tooltips", rows = {
-					Toggle("showInTooltip", "Show my mark in player tooltips",
-						"Adds a coloured line to the tooltip of a player you have marked, with their mark and, if you like, your note."),
-					Toggle("showNoteInTooltip", "Also show the note",
-						"Adds your note under the mark line.", { vis = function() return ns.Opt("showInTooltip") end }),
-					Toggle("tooltipFullNote", "Show the whole note",
-						"Wraps the full note onto as many lines as it needs. Off keeps it to one shortened line.",
+				{ key = "tooltips", title = L["Tooltips"], rows = {
+					Toggle("showInTooltip", L["Show my mark in player tooltips"],
+						L["Adds a coloured line to the tooltip of a player you have marked, with their mark and, if you like, your note."]),
+					Toggle("showNoteInTooltip", L["Also show the note"],
+						L["Adds your note under the mark line."], { vis = function() return ns.Opt("showInTooltip") end }),
+					Toggle("tooltipFullNote", L["Show the whole note"],
+						L["Wraps the full note onto as many lines as it needs. Off keeps it to one shortened line."],
 						{ vis = noteShown }),
 				} },
-				{ key = "chat", title = "Chat", rows = {
-					Toggle("chatLogging", "Message when a keybind marks",
-						"Prints a line in chat when a keybind marks or un-marks your target. The slash commands always reply, since typing one is already a chat interaction.",
-						{ tip = "The Badges preview shows this line." }),
-					Toggle("badgeChat", "Icon in front of chat lines",
-						"Puts a marked player's icon at the start of what they say in chat.",
-						{ tip = "The Badges preview shows it." }),
+				{ key = "chat", title = L["Chat"], rows = {
+					Toggle("chatLogging", L["Message when a keybind marks"],
+						L["Prints a line in chat when a keybind marks or un-marks your target. The slash commands always reply, since typing one is already a chat interaction."],
+						{ tip = L["The Badges preview shows this line."] }),
+					Toggle("badgeChat", L["Icon in front of chat lines"],
+						L["Puts a marked player's icon at the start of what they say in chat."],
+						{ tip = L["The Badges preview shows it."] }),
 				} },
-				{ key = "minimap", title = "Minimap", rows = {
-					{ kind = "toggle", label = "Show the minimap button",
-					  desc = "Left-click opens the marks list, right-click opens these settings, and you can drag it around the minimap.",
+				{ key = "minimap", title = L["Minimap"], rows = {
+					{ kind = "toggle", label = L["Show the minimap button"],
+					  desc = L["Left-click opens the marks list, right-click opens these settings, and you can drag it around the minimap."],
 					  get = function() return not (ns.DB().minimap and ns.DB().minimap.hide) end,
 					  set = function(v)
 						  local d = ns.DB()
@@ -779,112 +793,112 @@ local function definePages()
 			},
 		},
 		{
-			key = "badges", title = "Badges", preview = "badges",
-			desc = "The icon that marks a player where you see them: above their nameplate, on your target frame, and in chat. The preview above shows every change as you make it.",
+			key = "badges", title = L["Badges"], preview = "badges",
+			desc = L["The icon that marks a player where you see them: above their nameplate, on your target frame, and in chat. The preview above shows every change as you make it."],
 			sections = {
-				{ key = "where", title = "Where", rows = {
-					Toggle("badgeNameplate", "Above nameplates",
-						"A badge above the nameplate of a marked player, so you spot them in a crowd. It sits above the name and is layered over Blizzard's level box."),
-					Toggle("badgeTarget", "On the target frame",
-						"A small badge on your target's portrait. It only shows where Blizzard's target frame is visible; another unit-frame addon may hide it."),
+				{ key = "where", title = L["Where"], rows = {
+					Toggle("badgeNameplate", L["Above nameplates"],
+						L["A badge above the nameplate of a marked player, so you spot them in a crowd. It sits above the name and is layered over Blizzard's level box."]),
+					Toggle("badgeTarget", L["On the target frame"],
+						L["A small badge on your target's portrait. It only shows where Blizzard's target frame is visible; another unit-frame addon may hide it."]),
 				} },
-				{ key = "look", title = "Look", rows = {
-					Choice("badgeStyle", "Style",
-						"Icon is the bare mark. Ring puts it in a ring in the mark's colour.", STYLES,
+				{ key = "look", title = L["Look"], rows = {
+					Choice("badgeStyle", L["Style"],
+						L["Icon is the bare mark. Ring puts it in a ring in the mark's colour."], STYLES,
 						{ get = function() return ns.Opt("badgeStyle") == "icon" and "icon" or "ring" end }),
-					Slider("badgeSize", "Size", "How big the nameplate badge is, in pixels. The target badge is slightly smaller.", 14, 40, 2),
-					Toggle("popAnim", "Pop animation",
-						"The target badge pops when a keybind marks your target.",
-						{ vis = function() return ns.Opt("badgeTarget") end, tip = "Replay pop in the preview shows it." }),
+					Slider("badgeSize", L["Size"], L["How big the nameplate badge is, in pixels. The target badge is slightly smaller."], 14, 40, 2),
+					Toggle("popAnim", L["Pop animation"],
+						L["The target badge pops when a keybind marks your target."],
+						{ vis = function() return ns.Opt("badgeTarget") end, tip = L["Replay pop in the preview shows it."] }),
 				} },
-				{ key = "position", title = "Position", rows = {
-					Choice("badgeAnchor", "Nameplate anchor",
-						"Which side of the nameplate the badge sits on. Above is over the name; Below is under the health bar; Left is beside the bar; Right is beside Blizzard's level box.",
+				{ key = "position", title = L["Position"], rows = {
+					Choice("badgeAnchor", L["Nameplate anchor"],
+						L["Which side of the nameplate the badge sits on. Above is over the name; Below is under the health bar; Left is beside the bar; Right is beside Blizzard's level box."],
 						ANCHORS, { vis = function() return ns.Opt("badgeNameplate") end }),
-					Slider("badgeOffsetX", "Nameplate offset X",
-						"Moves the nameplate badge sideways from its anchor, left below zero and right above it. Useful if another addon puts something there.", -200, 200, 1,
+					Slider("badgeOffsetX", L["Nameplate offset X"],
+						L["Moves the nameplate badge sideways from its anchor, left below zero and right above it. Useful if another addon puts something there."], -200, 200, 1,
 						{ vis = function() return ns.Opt("badgeNameplate") end }),
-					Slider("badgeOffsetY", "Nameplate offset Y",
-						"Moves the nameplate badge up (above zero) or down (below zero) from its anchor.", -200, 200, 1,
+					Slider("badgeOffsetY", L["Nameplate offset Y"],
+						L["Moves the nameplate badge up (above zero) or down (below zero) from its anchor."], -200, 200, 1,
 						{ vis = function() return ns.Opt("badgeNameplate") end }),
-					Choice("badgeCorner", "Target badge corner",
-						"Which corner of your target's portrait the badge sits on. Blizzard puts the level number in a lower corner, so top right is the default.",
+					Choice("badgeCorner", L["Target badge corner"],
+						L["Which corner of your target's portrait the badge sits on. Blizzard puts the level number in a lower corner, so top right is the default."],
 						CORNERS, { vis = function() return ns.Opt("badgeTarget") end }),
 				} },
-				{ key = "reset", title = "Reset", rows = {
-					Button("Reset badge look", "Puts the badge switches, style, size, pop animation and position back to their defaults. Your marks, tooltips, chat and alert settings are left alone.",
-						function() return confirming and "|cffff5555Click again to confirm|r" or RESET_LABEL end, resetClick),
+				{ key = "reset", title = L["Reset"], rows = {
+					Button(L["Reset badge look"], L["Puts the badge switches, style, size, pop animation and position back to their defaults. Your marks, tooltips, chat and alert settings are left alone."],
+						function() return confirming and ("|cffff5555" .. L["Click again to confirm"] .. "|r") or RESET_LABEL end, resetClick),
 				} },
 			},
 		},
 		{
-			key = "alerts", title = "Alerts", preview = "alert",
-			desc = "A toast that appears when a marked player is in your group or raid, once each time they join, so you hear about a thumbs down before the pull.",
+			key = "alerts", title = L["Alerts"], preview = "alert",
+			desc = L["A toast that appears when a marked player is in your group or raid, once each time they join, so you hear about a thumbs down before the pull."],
 			sections = {
-				{ key = "group", title = "Group alert", rows = {
-					Toggle("groupAlert", "Alert when a marked player is in my group",
-						"Shows the toast with the player's name, mark and your note. Right-click (or click) it to dismiss; it goes by itself after a few seconds."),
-					Choice("alertSound", "Sound",
-						"The sound that plays with the alert. Picking one plays it.",
+				{ key = "group", title = L["Group alert"], rows = {
+					Toggle("groupAlert", L["Alert when a marked player is in my group"],
+						L["Shows the toast with the player's name, mark and your note. Right-click (or click) it to dismiss; it goes by itself after a few seconds."]),
+					Choice("alertSound", L["Sound"],
+						L["The sound that plays with the alert. Picking one plays it."],
 						function() return ns.SoundChoices() end,
 						{ vis = function() return ns.Opt("groupAlert") end,
 						  get = function() return ns.NormalizeSound(ns.Opt("alertSound")) end,
 						  set = function(v) ns.SetOpt("alertSound", v); if ns.PlayAlertSound then ns.PlayAlertSound() end end,
-						  tip = "Show real alert in the preview plays it too." }),
-					Button("Try it", "Pops the actual alert on your screen, with its sound, exactly as it appears when a marked player is in your group.",
-						"Show real alert", function() if ns.TestAlert then ns.TestAlert() end end,
-						{ tip = "Also /thumber test." }),
+						  tip = L["Show real alert in the preview plays it too."] }),
+					Button(L["Try it"], L["Pops the actual alert on your screen, with its sound, exactly as it appears when a marked player is in your group."],
+						L["Show real alert"], function() if ns.TestAlert then ns.TestAlert() end end,
+						{ tip = L["Also /thumber test."] }),
 				} },
-				{ key = "position", title = "Position", rows = {
-					Button("Alert position", "Unlock the alert to show it on screen as a placeholder you can drag anywhere. Lock it again, or close this window, to keep the spot. It is remembered between sessions.",
-						function() return ns.alertUnlocked and "Lock the alert" or "Unlock the alert" end,
+				{ key = "position", title = L["Position"], rows = {
+					Button(L["Alert position"], L["Unlock the alert to show it on screen as a placeholder you can drag anywhere. Lock it again, or close this window, to keep the spot. It is remembered between sessions."],
+						function() return ns.alertUnlocked and L["Lock the alert"] or L["Unlock the alert"] end,
 						function() if ns.SetAlertLocked then ns.SetAlertLocked(ns.alertUnlocked) end end,
-						{ tip = "Drag the placeholder with the left mouse button." }),
-					Button("Reset position", "Puts the alert back at the top right of the screen.",
-						"Reset position", function() if ns.ResetAlertPosition then ns.ResetAlertPosition() end end),
+						{ tip = L["Drag the placeholder with the left mouse button."] }),
+					Button(L["Reset position"], L["Puts the alert back at the top right of the screen."],
+						L["Reset position"], function() if ns.ResetAlertPosition then ns.ResetAlertPosition() end end),
 				} },
 			},
 		},
 		{
-			key = "sharing", title = "Sharing",
-			desc = "Hand your marks to a friend, or take theirs. A transfer to a player asks them first and never overwrites their marks; an export is one string you can paste anywhere.",
+			key = "sharing", title = L["Sharing"],
+			desc = L["Hand your marks to a friend, or take theirs. A transfer to a player asks them first and never overwrites their marks; an export is one string you can paste anywhere."],
 			sections = {
-				{ key = "receive", title = "Receiving", rows = {
-					Toggle("shareReceive", "Let other players offer me their marks",
-						"When someone offers to share their marks you get an Accept / Decline prompt. Nothing arrives unless you accept, and only marks you don't already have are added. Off declines every offer."),
+				{ key = "receive", title = L["Receiving"], rows = {
+					Toggle("shareReceive", L["Let other players offer me their marks"],
+						L["When someone offers to share their marks you get an Accept / Decline prompt. Nothing arrives unless you accept, and only marks you don't already have are added. Off declines every offer."]),
 				} },
-				{ key = "share", title = "Share", rows = {
-					Choice("shareScope", "What to share",
-						"All marks, or only your thumbs downs: handy for warning a friend about the players you would rather they avoided, without handing over your whole list. It applies to sending to a player and to exporting.",
-						{ { value = "all", text = "All marks" }, { value = "down", text = "Thumbs down only" } }),
-					Button("Share window", "Opens the share window: send your marks to a player, or export them as text and import someone else's, with a preview of what an import would change.",
-						"Open sharing", function() if ns.OpenShare then ns.OpenShare() end end,
-						{ tip = "Also /thumber share." }),
-				} },
-			},
-		},
-		{
-			key = "profile", title = "Profile",
-			desc = "All of Thumber's settings, positions and keybinds as one string: to move your setup to another character or install, or to keep a backup. Your marks have their own sharing and are not part of it.",
-			sections = {
-				{ key = "profile", title = "Profile", rows = {
-					Button("Export or import", "Opens the profile window. Export gives you one string to copy. Import checks a pasted string first, tells you what is in it, and applies it only when you press Apply: it replaces your settings, the positions of the marks window, alert and minimap button, and your four keybinds, and everything updates on the spot.",
-						"Open profile window", function() if ns.OpenProfile then ns.OpenProfile() end end,
-						{ tip = "Also /thumber profile." }),
+				{ key = "share", title = L["Share"], rows = {
+					Choice("shareScope", L["What to share"],
+						L["All marks, or only your thumbs downs: handy for warning a friend about the players you would rather they avoided, without handing over your whole list. It applies to sending to a player and to exporting."],
+						{ { value = "all", text = L["All marks"] }, { value = "down", text = L["Thumbs down only"] } }),
+					Button(L["Share window"], L["Opens the share window: send your marks to a player, or export them as text and import someone else's, with a preview of what an import would change."],
+						L["Open sharing"], function() if ns.OpenShare then ns.OpenShare() end end,
+						{ tip = L["Also /thumber share."] }),
 				} },
 			},
 		},
 		{
-			key = "keybinds", title = "Keybinds",
-			desc = "Mark your target (or mouseover) with a key. Marking a player with the mark they already have removes them. Click a button, then press the key; right-click clears it.",
+			key = "profile", title = L["Profile"],
+			desc = L["All of Thumber's settings, positions and keybinds as one string: to move your setup to another character or install, or to keep a backup. Your marks have their own sharing and are not part of it."],
 			sections = {
-				{ key = "keys", title = "Keybinds", rows = {
-					Bind("THUMBER_UP", "Thumbs up", "Marks your target thumbs up, or removes the mark if they already have it. Default: Arrow Up."),
-					Bind("THUMBER_DOWN", "Thumbs down", "Marks your target thumbs down, or removes the mark if they already have it. Default: Arrow Down."),
-					Bind("THUMBER_NEUTRAL", "Neutral", "Marks your target neutral, or removes the mark if they already have it. Default: Arrow Left."),
-					Bind("THUMBER_TOGGLE", "Open the list", "Opens or closes the marks list. Default: Arrow Right."),
-					Button("Restore the defaults", "Puts the four arrow-key defaults back: Up, Down, Left and Right. They take the keys from character movement, as they did the first time.",
-						"Restore defaults", function() if SlashCmdList and SlashCmdList.THUMBER then SlashCmdList.THUMBER("resetbinds") end end),
+				{ key = "profile", title = L["Profile"], rows = {
+					Button(L["Export or import"], L["Opens the profile window. Export gives you one string to copy. Import checks a pasted string first, tells you what is in it, and applies it only when you press Apply: it replaces your settings, the positions of the marks window, alert and minimap button, and your four keybinds, and everything updates on the spot."],
+						L["Open profile window"], function() if ns.OpenProfile then ns.OpenProfile() end end,
+						{ tip = L["Also /thumber profile."] }),
+				} },
+			},
+		},
+		{
+			key = "keybinds", title = L["Keybinds"],
+			desc = L["Mark your target (or mouseover) with a key. Marking a player with the mark they already have removes them. Click a button, then press the key; right-click clears it."],
+			sections = {
+				{ key = "keys", title = L["Keybinds"], rows = {
+					Bind("THUMBER_UP", L["Thumbs up"], L["Marks your target thumbs up, or removes the mark if they already have it. Default: Arrow Up."]),
+					Bind("THUMBER_DOWN", L["Thumbs down"], L["Marks your target thumbs down, or removes the mark if they already have it. Default: Arrow Down."]),
+					Bind("THUMBER_NEUTRAL", L["Neutral"], L["Marks your target neutral, or removes the mark if they already have it. Default: Arrow Left."]),
+					Bind("THUMBER_TOGGLE", L["Open the list"], L["Opens or closes the marks list. Default: Arrow Right."]),
+					Button(L["Restore the defaults"], L["Puts the four arrow-key defaults back: Up, Down, Left and Right. They take the keys from character movement, as they did the first time."],
+						L["Restore defaults"], function() if SlashCmdList and SlashCmdList.THUMBER then SlashCmdList.THUMBER("resetbinds") end end),
 				} },
 			},
 		},
@@ -1128,9 +1142,9 @@ local function BuildWindow()
 	version:SetText(meta and meta(ADDON, "Version") or "")
 	local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -4, -4)
-	local shareBtn = HeaderButton(frame, "Share", 80, function() if ns.OpenShare then ns.OpenShare() end end)
+	local shareBtn = HeaderButton(frame, L["Share"], 80, function() if ns.OpenShare then ns.OpenShare() end end)
 	shareBtn:SetPoint("RIGHT", close, "LEFT", -4, 0)
-	local listBtn = HeaderButton(frame, "Marks list", 100, function() if Thumber_Open then Thumber_Open() end end)
+	local listBtn = HeaderButton(frame, L["Marks list"], 100, function() if Thumber_Open then Thumber_Open() end end)
 	listBtn:SetPoint("RIGHT", shareBtn, "LEFT", -4, 0)
 	local headerLine = Line(frame)
 	headerLine:SetPoint("TOPLEFT", 6, -HEADER_H)

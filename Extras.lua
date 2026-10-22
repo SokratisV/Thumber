@@ -4,6 +4,7 @@
 -- from the Appearance section of /thumber config.
 
 local ADDON, ns = ...
+local L = ns.L
 
 local MARK, DB, Marks = ns.MARK, ns.DB, ns.Marks
 local IsSecret, UnitKey = ns.IsSecret, ns.UnitKey
@@ -408,14 +409,14 @@ end
 ----------------------------------------------------------------------
 -- The alert's sounds, by SOUNDKIT name; one this client doesn't have is simply not offered.
 local KITS = {
-	{ "raid", "Raid Warning", "RAID_WARNING" },
-	{ "alarm", "Alarm Clock", "ALARM_CLOCK_WARNING_3" },
-	{ "pvpqueue", "PvP Queue", "PVP_THROUGH_QUEUE" },
+	{ "raid", L["Raid Warning"], "RAID_WARNING" },
+	{ "alarm", L["Alarm Clock"], "ALARM_CLOCK_WARNING_3" },
+	{ "pvpqueue", L["PvP Queue"], "PVP_THROUGH_QUEUE" },
 }
 
 -- What the Sound setting can be: None, then the sounds above.
 function ns.SoundChoices()
-	local out = { { value = "none", text = "None" } }
+	local out = { { value = "none", text = L["None"] } }
 	for _, k in ipairs(KITS) do
 		if SOUNDKIT and SOUNDKIT[k[3]] then out[#out + 1] = { value = k[1], text = k[2] } end
 	end
@@ -501,7 +502,7 @@ local function BuildToast()
 	f.icon:SetPoint("LEFT", 14, 0)
 	f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	f.title:SetPoint("TOPLEFT", f.icon, "TOPRIGHT", 10, 2)
-	f.title:SetText("Marked player in your group")
+	f.title:SetText(L["Marked player in your group"])
 	f.name = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	f.name:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -3)
 	f.note = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -568,7 +569,7 @@ end
 
 -- /thumber test
 function ns.TestAlert()
-	Alert("Test Player", { mark = "down", note = "ninja looted last run", class = "DRUID" })
+	Alert(L["Test Player"], { mark = "down", note = L["ninja looted last run"], class = "DRUID" })
 end
 
 -- Moving the alert: unlocked, the toast sits on screen as a placeholder you can drag;
@@ -586,7 +587,7 @@ function ns.SetAlertLocked(locked)
 	showing = false
 	if ns.alertUnlocked then
 		local info = MARK.down
-		FillToast(f, info, "|cffff7d0aTest Player|r  |cff9a8b6e" .. info.label .. "|r", "Drag me where alerts should appear")
+		FillToast(f, info, "|cffff7d0a" .. L["Test Player"] .. "|r  |cff9a8b6e" .. info.label .. "|r", L["Drag me where alerts should appear"])
 		f:SetAlpha(1)
 		f:Show()
 	else

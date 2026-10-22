@@ -1,6 +1,26 @@
 ## Interface: 16001, 20505
 ## Title: Thumber
 ## Notes: Mark players thumbs up / neutral / thumbs down with an optional note. Shows in tooltips + a list.
+## Title-deDE: Thumber
+## Title-frFR: Thumber
+## Title-esES: Thumber
+## Title-esMX: Thumber
+## Title-ptBR: Thumber
+## Title-ruRU: Thumber
+## Title-koKR: Thumber
+## Title-zhCN: Thumber
+## Title-zhTW: Thumber
+## Title-itIT: Thumber
+## Notes-deDE: Markiere Spieler mit Daumen hoch / neutral / Daumen runter und optionaler Notiz. Erscheint in Tooltips und einer Liste.
+## Notes-frFR: Marquez les joueurs d'un pouce levé / neutre / pouce baissé, avec une note facultative. S'affiche dans les infobulles et une liste.
+## Notes-esES: Marca a los jugadores con pulgar arriba / neutral / pulgar abajo y una nota opcional. Se muestra en las descripciones emergentes y en una lista.
+## Notes-esMX: Marca a los jugadores con pulgar arriba / neutral / pulgar abajo y una nota opcional. Se muestra en las descripciones emergentes y en una lista.
+## Notes-ptBR: Marque jogadores com polegar para cima / neutro / polegar para baixo e uma nota opcional. Aparece nas dicas de ferramenta e em uma lista.
+## Notes-ruRU: Отмечайте игроков меткой «палец вверх» / «нейтрально» / «палец вниз» с необязательной заметкой. Показывается в подсказках и в списке.
+## Notes-koKR: 플레이어에게 엄지 위로 / 중립 / 엄지 아래로를 표시하고 메모를 남길 수 있습니다. 툴팁과 목록에 표시됩니다.
+## Notes-zhCN: 用点赞 / 中立 / 点踩标记玩家，并可附带备注。会显示在鼠标提示和列表中。
+## Notes-zhTW: 用讚 / 中立 / 倒讚標記玩家，並可附上備註。會顯示在滑鼠提示與清單中。
+## Notes-itIT: Segna i giocatori con pollice su / neutrale / pollice giù e una nota facoltativa. Compare nelle descrizioni e in un elenco.
 ## Author: Sokratis
 ## Version: 1.5.0
 ## X-License: MIT
@@ -9,6 +29,17 @@
 ## X-Curse-Project-ID: 1566935
 
 embeds.xml
+Locales\Locale.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\ptBR.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
+Locales\itIT.lua
 Thumber.lua
 Extras.lua
 Share.lua

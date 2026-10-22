@@ -10,6 +10,7 @@
 -- unless you explicitly choose to overwrite.
 
 local ADDON, ns = ...
+local L = ns.L
 
 local MARK, Marks = ns.MARK, ns.Marks
 local IsSecret, DisplayName = ns.IsSecret, ns.DisplayName
@@ -91,8 +92,20 @@ end
 -- What can be shared: every mark, or only the thumbs downs (to warn someone about the
 -- people you would rather they avoided, without handing over your whole list).
 local SCOPES = {
-	all  = { label = "All marks", none = "You have no marks to share.", of = "marks" },
-	down = { label = "Thumbs down only", none = "You have no thumbs down marks to share.", of = "thumbs down marks" },
+	all  = {
+		label = L["All marks"],
+		none = L["You have no marks to share."],
+		noneExport = L["You have no marks to export."],
+		exported = L["%d marks exported. Press Ctrl+C to copy, then paste it wherever you like."],
+		waiting = L["Waiting for %s to accept %d marks..."],
+	},
+	down = {
+		label = L["Thumbs down only"],
+		none = L["You have no thumbs down marks to share."],
+		noneExport = L["You have no thumbs down marks to export."],
+		exported = L["%d thumbs down marks exported. Press Ctrl+C to copy, then paste it wherever you like."],
+		waiting = L["Waiting for %s to accept %d thumbs down marks..."],
+	},
 }
 local function ScopeOf(scope)
 	return SCOPES[scope] and scope or "all"
@@ -118,11 +131,11 @@ end
 -- Text block back into a validated list of marks, or nil and a reason.
 local function ParsePayload(raw)
 	local lines = Split(raw, "\n")
-	if lines[1] ~= "THUMBER" .. VERSION then return nil, "This was made by a different version of Thumber." end
+	if lines[1] ~= "THUMBER" .. VERSION then return nil, L["This was made by a different version of Thumber."] end
 	local unique = lines[2] == "u=1"
 	if unique ~= ns.UniqueNames() then
-		return nil, unique and "These marks come from WoW Forever, where names have surnames, so they can't be used here."
-			or "These marks come from the Anniversary client, so they can't be used on WoW Forever."
+		return nil, unique and L["These marks come from WoW Forever, where names have surnames, so they can't be used here."]
+			or L["These marks come from the Anniversary client, so they can't be used on WoW Forever."]
 	end
 	local entries = {}
 	for i = 3, #lines do
@@ -154,9 +167,9 @@ end
 local function Parse(text)
 	text = (text or ""):gsub("%s+", "")
 	local body = text:match("^THUMBER:(.+)$")
-	if not body then return nil, "That doesn't look like a Thumber export." end
+	if not body then return nil, L["That doesn't look like a Thumber export."] end
 	local raw = B64Decode(body)
-	if not raw then return nil, "The text is damaged. Copy the whole string again." end
+	if not raw then return nil, L["The text is damaged. Copy the whole string again."] end
 	return ParsePayload(raw)
 end
 
@@ -234,19 +247,19 @@ local function Pump(o)
 	if out ~= o then return end
 	local chunk = o.chunks[o.idx + 1]
 	if not chunk then
-		Status(("Sent %d marks to %s."):format(o.count, o.target))
-		Print(("sent %d marks to %s."):format(o.count, o.target))
+		Status(L["Sent %d marks to %s."]:format(o.count, o.target))
+		Print(L["sent %d marks to %s."]:format(o.count, o.target))
 		out = nil
 		return
 	end
 	local ok, res = SendMsg(("C:%s:%d:%s"):format(o.id, o.idx + 1, chunk), o.target)
 	if ok then
 		o.idx, o.tries = o.idx + 1, 0
-		Status(("Sending to %s... %d / %d"):format(o.target, o.idx, #o.chunks))
+		Status(L["Sending to %s... %d / %d"]:format(o.target, o.idx, #o.chunks))
 	else
 		o.tries = (o.tries or 0) + 1
 		if not (res and RETRY_RESULTS[res]) or o.tries > 5 then
-			Status("Sending stopped: the game wouldn't take the messages. Try again in a moment.")
+			Status(L["Sending stopped: the game wouldn't take the messages. Try again in a moment."])
 			out = nil
 			return
 		end
@@ -258,24 +271,24 @@ end
 function ns.SendMarks(target, scope)
 	scope = ScopeOf(scope or ns.Opt("shareScope"))
 	target = ns.NormalizeKey(target or "")
-	if target == "" then return false, "Type a player's name first." end
+	if target == "" then return false, L["Type a player's name first."] end
 	local payload, count = Serialize(scope)
 	if count == 0 then return false, SCOPES[scope].none end
 	local data = B64Encode(payload)
 	local chunks = {}
 	for i = 1, #data, CHUNK do chunks[#chunks + 1] = data:sub(i, i + CHUNK - 1) end
-	if #chunks > MAX_CHUNKS then return false, "That's too many marks to send. Use export instead." end
+	if #chunks > MAX_CHUNKS then return false, L["That's too many marks to send. Use export instead."] end
 
 	local id = ("%06x"):format(math.random(0, 0xFFFFFF))
 	local ok = SendMsg(("O:%s:%d:%d:%d"):format(id, #chunks, count, ns.UniqueNames() and 1 or 0), target)
-	if not ok then return false, "Couldn't send anything to " .. target .. "." end
+	if not ok then return false, L["Couldn't send anything to %s."]:format(target) end
 	local o = { id = id, target = target, chunks = chunks, idx = 0, count = count }
 	out = o
-	Status(("Waiting for %s to accept %d %s..."):format(target, count, SCOPES[scope].of))
+	Status(SCOPES[scope].waiting:format(target, count))
 	C_Timer.After(OFFER_WAIT, function()
 		if out == o and not o.sending then
 			out = nil
-			Status(("No answer from %s. They may be offline, not have Thumber, or have said no."):format(target))
+			Status(L["No answer from %s. They may be offline, not have Thumber, or have said no."]:format(target))
 		end
 	end)
 	return true
@@ -288,7 +301,7 @@ local function Watch(i)
 	C_Timer.After(10, function()
 		if inc ~= i then return end
 		if GetTime() - i.last > 40 then
-			Print(("the transfer from %s timed out."):format(i.sender))
+			Print(L["the transfer from %s timed out."]:format(i.sender))
 			inc = nil
 		else
 			Watch(i)
@@ -302,11 +315,11 @@ local function Finish(i)
 	for n = 1, i.total do parts[n] = i.got[n] end
 	local entries, err = Parse("THUMBER:" .. table.concat(parts))
 	if not entries then
-		Print(("what %s sent couldn't be read: %s"):format(i.sender, err or "damaged data"))
+		Print(L["what %s sent couldn't be read: %s"]:format(i.sender, err or L["damaged data"]))
 		return
 	end
 	local added = Apply(entries, false)
-	Print(("received %d marks from %s: %d new, %d you already had."):format(#entries, i.sender, added, #entries - added))
+	Print(L["received %d marks from %s: %d new, %d you already had."]:format(#entries, i.sender, added, #entries - added))
 end
 
 local function Decline(o, reason)
@@ -320,7 +333,7 @@ local function Accept(o)
 	local i = { id = o.id, sender = o.sender, total = o.total, count = o.count, got = {}, n = 0, last = GetTime() }
 	inc = i
 	SendMsg("A:" .. o.id, o.sender)
-	Print(("receiving %d marks from %s..."):format(o.count, o.sender))
+	Print(L["receiving %d marks from %s..."]:format(o.count, o.sender))
 	Watch(i)
 end
 
@@ -341,7 +354,7 @@ local function OnOffer(sender, rest)
 	if not ns.Opt("shareReceive") then return Decline(o, "off") end
 	if inc or offer then return Decline(o, "busy") end
 	if (unique == "1") ~= ns.UniqueNames() then
-		Print(("%s tried to send marks from a different kind of client; ignored."):format(sender))
+		Print(L["%s tried to send marks from a different kind of client; ignored."]:format(sender))
 		return Decline(o, "style")
 	end
 	if total < 1 or total > MAX_CHUNKS or count > MAX_MARKS then return Decline(o, "size") end
@@ -350,8 +363,8 @@ local function OnOffer(sender, rest)
 end
 
 local DECLINED = {
-	busy = "is busy with another transfer", off = "isn't accepting shared marks",
-	style = "is on a different kind of client", size = "can't take that many marks",
+	busy = L["%s is busy with another transfer."], off = L["%s isn't accepting shared marks."],
+	style = L["%s is on a different kind of client."], size = L["%s can't take that many marks."],
 }
 
 local function OnMessage(prefix, text, _, sender)
@@ -363,13 +376,13 @@ local function OnMessage(prefix, text, _, sender)
 	elseif kind == "A" then
 		if out and out.id == rest and not out.sending and SameName(sender, out.target) then
 			out.sending = true
-			Status(("%s accepted. Sending..."):format(out.target))
+			Status(L["%s accepted. Sending..."]:format(out.target))
 			Pump(out)
 		end
 	elseif kind == "D" then
 		local id, reason = rest:match("^(%x+):(%a*)$")
 		if out and out.id == id and SameName(sender, out.target) then
-			Status(("%s %s."):format(out.target, DECLINED[reason] or "said no"))
+			Status((DECLINED[reason] or L["%s said no."]):format(out.target))
 			out = nil
 		end
 	elseif kind == "C" then
@@ -398,11 +411,14 @@ local function Rule(parent, y)
 	t:SetPoint("TOPRIGHT", -6, y)
 end
 
-local function Button(parent, text, w, x, y, onClick)
+-- A button as wide as its own text needs (never narrower than minWidth); the caller places
+-- it. German and Russian labels run much longer than English ones.
+local function Button(parent, text, minWidth, onClick)
 	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	b:SetSize(w, 22)
-	b:SetPoint("TOPLEFT", x, y)
+	b:SetHeight(22)
 	b:SetText(text)
+	local fs = b:GetFontString()
+	b:SetWidth(math.max(minWidth, math.ceil(fs and fs:GetStringWidth() or 60) + 28))
 	b:SetScript("OnClick", onClick)
 	return b
 end
@@ -433,7 +449,7 @@ local function BuildDialog()
 
 	local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 16, -12)
-	title:SetText("Share marks")
+	title:SetText(L["Share marks"])
 	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -4, -4)
 	Rule(f, -34)
@@ -456,8 +472,8 @@ local function BuildDialog()
 			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 			GameTooltip:SetText(SCOPES[scope].label)
 			GameTooltip:AddLine(scope == "all"
-				and "Share every mark you have. Applies to sending to a player and to exporting."
-				or "Share only the players you marked thumbs down, so you can warn someone without handing over your whole list. Applies to sending to a player and to exporting.",
+				and L["Share every mark you have. Applies to sending to a player and to exporting."]
+				or L["Share only the players you marked thumbs down, so you can warn someone without handing over your whole list. Applies to sending to a player and to exporting."],
 				0.85, 0.85, 0.85, true)
 			GameTooltip:Show()
 		end)
@@ -490,45 +506,51 @@ local function BuildDialog()
 	-- Send to a player
 	local sendLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	sendLabel:SetPoint("TOPLEFT", 16, -46)
-	sendLabel:SetText("Send to a player")
+	sendLabel:SetText(L["Send to a player"])
 
 	local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-	nameBox:SetPoint("TOPLEFT", 22, -68)
-	nameBox:SetSize(190, 20)
 	nameBox:SetAutoFocus(false)
 	nameBox:SetFontObject(ChatFontNormal)
 	nameBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 	nameBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	f.nameBox = nameBox
 
-	Button(f, "Target", 70, 222, -67, function()
-		local key = ns.UnitKey("target") or ns.UnitKey("mouseover")
-		if key then nameBox:SetText(key) else Status("Target a player first.") end
-	end)
-	Button(f, "Send", 70, 298, -67, function()
+	local sendBtn = Button(f, L["Send"], 70, function()
 		local ok, err = ns.SendMarks(nameBox:GetText())
 		if not ok then Status(err) end
 	end)
+	sendBtn:SetPoint("TOPRIGHT", -16, -67)
+	local targetBtn = Button(f, L["Target"], 70, function()
+		local key = ns.UnitKey("target") or ns.UnitKey("mouseover")
+		if key then nameBox:SetText(key) else Status(L["Target a player first."]) end
+	end)
+	targetBtn:SetPoint("RIGHT", sendBtn, "LEFT", -6, 0)
+	nameBox:SetPoint("TOPLEFT", 22, -68)
+	nameBox:SetPoint("TOPRIGHT", targetBtn, "TOPLEFT", -8, -1)
+	nameBox:SetHeight(20)
 
 	local status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	status:SetPoint("TOPLEFT", 16, -98)
 	status:SetPoint("TOPRIGHT", -16, -98)
 	status:SetJustifyH("LEFT")
 	status:SetHeight(28)
-	status:SetText("They get asked first. Only marks they don't already have are added.")
+	status:SetText(L["They get asked first. Only marks they don't already have are added."])
 	f.status = status
 	Rule(f, -134)
 
 	-- Export / import
 	local ioLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	ioLabel:SetPoint("TOPLEFT", 16, -146)
-	ioLabel:SetText("Export or import (copy and paste)")
+	ioLabel:SetText(L["Export or import (copy and paste)"])
 
 	local eb
 	local ok, sf = pcall(CreateFrame, "ScrollFrame", nil, f, "InputScrollFrameTemplate")
 	if ok and sf and sf.EditBox then
 		sf:SetPoint("TOPLEFT", 16, -170)
-		sf:SetSize(410, 130)
+		sf:SetPoint("TOPRIGHT", -16, -170)
+		sf:SetHeight(130)
+		-- the edit box follows the window's width, which grows with its button rows
+		sf:HookScript("OnSizeChanged", function(self, w) eb:SetWidth(math.max(50, (w or 410) - 20)) end)
 		if sf.CharCount then sf.CharCount:Hide() end
 		eb = sf.EditBox
 		eb:SetWidth(390)
@@ -536,7 +558,8 @@ local function BuildDialog()
 	else
 		eb = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
 		eb:SetPoint("TOPLEFT", 22, -170)
-		eb:SetSize(400, 130)
+		eb:SetPoint("TOPRIGHT", -22, -170)
+		eb:SetHeight(130)
 		eb:SetMultiLine(true)
 	end
 	eb:SetFontObject(ChatFontNormal)
@@ -551,53 +574,77 @@ local function BuildDialog()
 	summary:SetHeight(28)
 	f.summary = summary
 
-	local addNew = Button(f, "Add new only", 120, 16, -376, function()
+	local addNew = Button(f, L["Add new only"], 120, function()
 		if not f.parsed then return end
 		local added = Apply(f.parsed, false)
-		summary:SetText(("Added %d new marks."):format(added))
-		Print(("imported %d new marks."):format(added))
+		summary:SetText(L["Added %d new marks."]:format(added))
+		Print(L["imported %d new marks."]:format(added))
 		f.parsed = nil
 		f.addNew:Hide(); f.addAll:Hide()
 	end)
-	local addAll = Button(f, "Add new and overwrite", 170, 142, -376, function()
+	local addAll = Button(f, L["Add new and overwrite"], 170, function()
 		if not f.parsed then return end
 		local added, updated = Apply(f.parsed, true)
-		summary:SetText(("Added %d new marks and updated %d."):format(added, updated))
-		Print(("imported %d new marks and updated %d."):format(added, updated))
+		summary:SetText(L["Added %d new marks and updated %d."]:format(added, updated))
+		Print(L["imported %d new marks and updated %d."]:format(added, updated))
 		f.parsed = nil
 		f.addNew:Hide(); f.addAll:Hide()
 	end)
+	addNew:SetPoint("TOPLEFT", 16, -376)
+	addAll:SetPoint("TOPLEFT", 16, -376)
 	addNew:Hide(); addAll:Hide()
 	f.addNew, f.addAll = addNew, addAll
+	-- the second sits beside the first, or alone at the left when the first is not offered
+	local function PlaceAddAll(besideFirst)
+		addAll:ClearAllPoints()
+		if besideFirst then addAll:SetPoint("LEFT", addNew, "RIGHT", 6, 0) else addAll:SetPoint("TOPLEFT", 16, -376) end
+	end
 
 	local function ClearParsed() f.parsed = nil; addNew:Hide(); addAll:Hide() end
-	Button(f, "Export", 100, 16, -312, function()
+	local exportBtn = Button(f, L["Export"], 100, function()
 		ClearParsed()
 		local scope = ScopeOf(ns.Opt("shareScope"))
 		local text, n = Export(scope)
-		if n == 0 then summary:SetText((SCOPES[scope].none:gsub("share", "export"))) return end
+		if n == 0 then summary:SetText(SCOPES[scope].noneExport) return end
 		eb:SetText(text)
 		eb:HighlightText()
 		eb:SetFocus()
-		summary:SetText(("%d %s exported. Press Ctrl+C to copy, then paste it wherever you like."):format(n, SCOPES[scope].of))
+		summary:SetText(SCOPES[scope].exported:format(n))
 	end)
-	Button(f, "Preview import", 120, 122, -312, function()
+	local previewBtn = Button(f, L["Preview import"], 120, function()
 		ClearParsed()
 		local entries, err = Parse(eb:GetText())
 		if not entries then summary:SetText("|cffff6060" .. err .. "|r") return end
-		if #entries == 0 then summary:SetText("There are no marks in that text.") return end
+		if #entries == 0 then summary:SetText(L["There are no marks in that text."]) return end
 		local new, differ, same = Compare(entries)
-		summary:SetText(("%d marks: %d new, %d different from yours, %d the same."):format(#entries, new, differ, same))
+		summary:SetText(L["%d marks: %d new, %d different from yours, %d the same."]:format(#entries, new, differ, same))
 		f.parsed = entries
 		addNew:SetShown(new > 0)
 		addAll:SetShown(new > 0 or differ > 0)
-		if addNew:IsShown() then addAll:SetPoint("TOPLEFT", 142, -376) else addAll:SetPoint("TOPLEFT", 16, -376) end
+		PlaceAddAll(addNew:IsShown())
 	end)
-	Button(f, "Clear", 60, 248, -312, function()
+	local clearBtn = Button(f, L["Clear"], 60, function()
 		eb:SetText("")
 		ClearParsed()
 		summary:SetText("")
 	end)
+	exportBtn:SetPoint("TOPLEFT", 16, -312)
+	previewBtn:SetPoint("LEFT", exportBtn, "RIGHT", 6, 0)
+	clearBtn:SetPoint("LEFT", previewBtn, "RIGHT", 6, 0)
+
+	-- The window is as wide as its widest row of buttons needs, and as the header does:
+	-- the title and the two share choices.
+	local rowB = exportBtn:GetWidth() + previewBtn:GetWidth() + clearBtn:GetWidth() + 12
+	local rowC = addNew:GetWidth() + addAll:GetWidth() + 6
+	local probe = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	local pillsWidth = 4
+	for _, sc in ipairs({ "all", "down" }) do
+		probe:SetText(SCOPES[sc].label .. " (999)")
+		pillsWidth = pillsWidth + math.ceil(probe:GetStringWidth() or 100) + 22
+	end
+	probe:Hide()
+	local header = math.ceil(title:GetStringWidth() or 100) + pillsWidth + 16 + 40 + 24
+	f:SetWidth(math.max(460, rowB + 32, rowC + 32, header))
 
 	f.UpdateScope()
 	f:Hide()
@@ -625,20 +672,22 @@ function ShowOffer(o)
 		f.text:SetPoint("TOPLEFT", 16, -14)
 		f.text:SetPoint("TOPRIGHT", -16, -14)
 		f.text:SetJustifyH("CENTER")
-		f.accept = Button(f, "Accept", 110, 60, -68, function()
+		f.accept = Button(f, ACCEPT or L["Accept"], 110, function()
 			local cur = f.offer
 			f:Hide()
 			if cur then Accept(cur) end
 		end)
-		f.decline = Button(f, "Decline", 110, 190, -68, function()
+		f.accept:SetPoint("TOPRIGHT", f, "TOP", -4, -68)
+		f.decline = Button(f, DECLINE or L["Decline"], 110, function()
 			local cur = f.offer
 			f:Hide()
 			if cur and offer == cur then Decline(cur) end
 		end)
+		f.decline:SetPoint("TOPLEFT", f, "TOP", 4, -68)
 		offerFrame = f
 	end
 	f.offer = o
-	f.text:SetText(("|cffffd100%s|r wants to share %d Thumber marks with you.\nYour own marks are kept; only new ones are added."):format(o.sender, o.count))
+	f.text:SetText(L["|cffffd100%s|r wants to share %d Thumber marks with you.\nYour own marks are kept; only new ones are added."]:format(o.sender, o.count))
 	f:Show()
 	C_Timer.After(45, function()
 		if f.offer == o and offer == o then
