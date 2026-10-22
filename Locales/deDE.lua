@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "deDE" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "Ziel: Daumen hoch  (Standard: Pfeil nach oben)"
-L["Thumbs down target  (default: Arrow Down)"] = "Ziel: Daumen runter  (Standard: Pfeil nach unten)"
-L["Neutral target  (default: Arrow Left)"] = "Ziel: Neutral  (Standard: Pfeil nach links)"
+L["Thumbs up target  (default: Arrow Up)"] = "Ziel markieren: Daumen hoch  (Standard: Pfeil nach oben)"
+L["Thumbs down target  (default: Arrow Down)"] = "Ziel markieren: Daumen runter  (Standard: Pfeil nach unten)"
+L["Neutral target  (default: Arrow Left)"] = "Ziel markieren: Neutral  (Standard: Pfeil nach links)"
 L["Open the marks list  (default: Arrow Right)"] = "Markierungsliste öffnen  (Standard: Pfeil nach rechts)"
 L["Thumbs Up"] = "Daumen hoch"
 L["Neutral"] = "Neutral"

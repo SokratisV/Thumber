@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "ptBR" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "Polegar para cima no alvo  (padrão: seta para cima)"
-L["Thumbs down target  (default: Arrow Down)"] = "Polegar para baixo no alvo  (padrão: seta para baixo)"
-L["Neutral target  (default: Arrow Left)"] = "Neutro no alvo  (padrão: seta para a esquerda)"
+L["Thumbs up target  (default: Arrow Up)"] = "Marcar alvo: polegar para cima  (padrão: seta para cima)"
+L["Thumbs down target  (default: Arrow Down)"] = "Marcar alvo: polegar para baixo  (padrão: seta para baixo)"
+L["Neutral target  (default: Arrow Left)"] = "Marcar alvo: neutro  (padrão: seta para a esquerda)"
 L["Open the marks list  (default: Arrow Right)"] = "Abrir a lista de marcas  (padrão: seta para a direita)"
 L["Thumbs Up"] = "Polegar para cima"
 L["Neutral"] = "Neutro"

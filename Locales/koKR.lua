@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "koKR" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "대상에게 엄지 위로  (기본값: 위쪽 화살표)"
-L["Thumbs down target  (default: Arrow Down)"] = "대상에게 엄지 아래로  (기본값: 아래쪽 화살표)"
-L["Neutral target  (default: Arrow Left)"] = "대상에게 중립  (기본값: 왼쪽 화살표)"
+L["Thumbs up target  (default: Arrow Up)"] = "대상 표시: 엄지 위로  (기본값: 위쪽 화살표)"
+L["Thumbs down target  (default: Arrow Down)"] = "대상 표시: 엄지 아래로  (기본값: 아래쪽 화살표)"
+L["Neutral target  (default: Arrow Left)"] = "대상 표시: 중립  (기본값: 왼쪽 화살표)"
 L["Open the marks list  (default: Arrow Right)"] = "표시 목록 열기  (기본값: 오른쪽 화살표)"
 L["Thumbs Up"] = "엄지 위로"
 L["Neutral"] = "중립"

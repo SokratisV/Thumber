@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "itIT" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "Pollice su al bersaglio  (predefinito: freccia su)"
-L["Thumbs down target  (default: Arrow Down)"] = "Pollice giù al bersaglio  (predefinito: freccia giù)"
-L["Neutral target  (default: Arrow Left)"] = "Neutrale al bersaglio  (predefinito: freccia sinistra)"
+L["Thumbs up target  (default: Arrow Up)"] = "Segna bersaglio: pollice su  (predefinito: freccia su)"
+L["Thumbs down target  (default: Arrow Down)"] = "Segna bersaglio: pollice giù  (predefinito: freccia giù)"
+L["Neutral target  (default: Arrow Left)"] = "Segna bersaglio: neutrale  (predefinito: freccia sinistra)"
 L["Open the marks list  (default: Arrow Right)"] = "Apri l'elenco dei segni  (predefinito: freccia destra)"
 L["Thumbs Up"] = "Pollice su"
 L["Neutral"] = "Neutrale"

@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "zhCN" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "对目标点赞  (默认：上方向键)"
-L["Thumbs down target  (default: Arrow Down)"] = "对目标点踩  (默认：下方向键)"
-L["Neutral target  (default: Arrow Left)"] = "对目标标记中立  (默认：左方向键)"
+L["Thumbs up target  (default: Arrow Up)"] = "标记目标：点赞  (默认：上方向键)"
+L["Thumbs down target  (default: Arrow Down)"] = "标记目标：点踩  (默认：下方向键)"
+L["Neutral target  (default: Arrow Left)"] = "标记目标：中立  (默认：左方向键)"
 L["Open the marks list  (default: Arrow Right)"] = "打开标记列表  (默认：右方向键)"
 L["Thumbs Up"] = "点赞"
 L["Neutral"] = "中立"

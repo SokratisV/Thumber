@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "zhTW" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "對目標比讚  (預設：上方向鍵)"
-L["Thumbs down target  (default: Arrow Down)"] = "對目標比倒讚  (預設：下方向鍵)"
-L["Neutral target  (default: Arrow Left)"] = "對目標標記為中立  (預設：左方向鍵)"
+L["Thumbs up target  (default: Arrow Up)"] = "標記目標：讚  (預設：上方向鍵)"
+L["Thumbs down target  (default: Arrow Down)"] = "標記目標：倒讚  (預設：下方向鍵)"
+L["Neutral target  (default: Arrow Left)"] = "標記目標：中立  (預設：左方向鍵)"
 L["Open the marks list  (default: Arrow Right)"] = "開啟標記清單  (預設：右方向鍵)"
 L["Thumbs Up"] = "讚"
 L["Neutral"] = "中立"

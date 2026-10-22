@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "ruRU" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "Палец вверх цели  (по умолчанию: стрелка вверх)"
-L["Thumbs down target  (default: Arrow Down)"] = "Палец вниз цели  (по умолчанию: стрелка вниз)"
-L["Neutral target  (default: Arrow Left)"] = "Нейтрально цели  (по умолчанию: стрелка влево)"
+L["Thumbs up target  (default: Arrow Up)"] = "Отметить цель: палец вверх  (по умолчанию: стрелка вверх)"
+L["Thumbs down target  (default: Arrow Down)"] = "Отметить цель: палец вниз  (по умолчанию: стрелка вниз)"
+L["Neutral target  (default: Arrow Left)"] = "Отметить цель: нейтрально  (по умолчанию: стрелка влево)"
 L["Open the marks list  (default: Arrow Right)"] = "Открыть список меток  (по умолчанию: стрелка вправо)"
 L["Thumbs Up"] = "Палец вверх"
 L["Neutral"] = "Нейтрально"

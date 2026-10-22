@@ -2,9 +2,9 @@ local _, ns = ...
 if GetLocale() ~= "esMX" then return end
 local L = ns.L
 
-L["Thumbs up target  (default: Arrow Up)"] = "Pulgar arriba al objetivo  (por defecto: flecha arriba)"
-L["Thumbs down target  (default: Arrow Down)"] = "Pulgar abajo al objetivo  (por defecto: flecha abajo)"
-L["Neutral target  (default: Arrow Left)"] = "Neutral al objetivo  (por defecto: flecha izquierda)"
+L["Thumbs up target  (default: Arrow Up)"] = "Marcar objetivo: pulgar arriba  (por defecto: flecha arriba)"
+L["Thumbs down target  (default: Arrow Down)"] = "Marcar objetivo: pulgar abajo  (por defecto: flecha abajo)"
+L["Neutral target  (default: Arrow Left)"] = "Marcar objetivo: neutral  (por defecto: flecha izquierda)"
 L["Open the marks list  (default: Arrow Right)"] = "Abrir la lista de marcas  (por defecto: flecha derecha)"
 L["Thumbs Up"] = "Pulgar arriba"
 L["Neutral"] = "Neutral"
