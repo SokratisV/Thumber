@@ -32,6 +32,7 @@ local DEFAULTS = {
 	showInTooltip  = true,   -- your mark in a player's tooltip
 	showNoteInTooltip = true, -- ...and your note under it
 }
+ns.DEFAULTS = DEFAULTS -- the complete list of options, which a profile is built from
 
 function ns.Opt(name)
 	local v = DB()[name]
@@ -597,6 +598,11 @@ end
 
 function ns.ResetAlertPosition()
 	DB().alertPos = nil
+	if toast then ApplyToastPos(toast) end
+end
+
+-- Put the alert where the saved position says (after a profile import).
+function ns.ApplyAlertPosition()
 	if toast then ApplyToastPos(toast) end
 end
 

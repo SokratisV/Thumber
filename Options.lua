@@ -61,17 +61,17 @@ local function merge(row, extra)
 	return row
 end
 local function Toggle(name, label, desc, extra)
-	return merge({ kind = "toggle", label = label, desc = desc,
+	return merge({ kind = "toggle", opt = name, label = label, desc = desc,
 		get = function() return ns.Opt(name) and true or false end,
 		set = function(v) ns.SetOpt(name, v) end }, extra)
 end
 local function Choice(name, label, desc, choices, extra)
-	return merge({ kind = "choice", label = label, desc = desc, choices = choices,
+	return merge({ kind = "choice", opt = name, label = label, desc = desc, choices = choices,
 		get = function() return ns.Opt(name) end,
 		set = function(v) ns.SetOpt(name, v) end }, extra)
 end
 local function Slider(name, label, desc, lo, hi, step, extra)
-	return merge({ kind = "slider", label = label, desc = desc, min = lo, max = hi, step = step,
+	return merge({ kind = "slider", opt = name, label = label, desc = desc, min = lo, max = hi, step = step,
 		get = function() return tonumber(ns.Opt(name)) or lo end,
 		set = function(v) ns.SetOpt(name, v) end }, extra)
 end
@@ -864,6 +864,17 @@ local function definePages()
 			},
 		},
 		{
+			key = "profile", title = "Profile",
+			desc = "All of Thumber's settings, positions and keybinds as one string: to move your setup to another character or install, or to keep a backup. Your marks have their own sharing and are not part of it.",
+			sections = {
+				{ key = "profile", title = "Profile", rows = {
+					Button("Export or import", "Opens the profile window. Export gives you one string to copy. Import checks a pasted string first, tells you what is in it, and applies it only when you press Apply: it replaces your settings, the positions of the marks window, alert and minimap button, and your four keybinds, and everything updates on the spot.",
+						"Open profile window", function() if ns.OpenProfile then ns.OpenProfile() end end,
+						{ tip = "Also /thumber profile." }),
+				} },
+			},
+		},
+		{
 			key = "keybinds", title = "Keybinds",
 			desc = "Mark your target (or mouseover) with a key. Marking a player with the mark they already have removes them. Click a button, then press the key; right-click clears it.",
 			sections = {
@@ -881,6 +892,30 @@ local function definePages()
 	pageByKey = {}
 	for _, p in ipairs(pages) do pageByKey[p.key] = p end
 	ns._optionPages = pages
+end
+
+-- What each setting accepts (a slider's range, a choice's values), read from the rows
+-- above, so an imported profile is held to exactly what this window lets you pick.
+function ns.OptionRules()
+	if not pages then definePages() end
+	local rules = {}
+	for _, p in ipairs(pages) do
+		for _, section in ipairs(p.sections) do
+			for _, row in ipairs(section.rows) do
+				if row.opt then
+					local rule = { kind = row.kind }
+					if row.kind == "slider" then
+						rule.min, rule.max = row.min, row.max
+					elseif row.kind == "choice" then
+						rule.values = {}
+						for _, c in ipairs(val(row.choices)) do rule.values[c.value] = true end
+					end
+					rules[row.opt] = rule
+				end
+			end
+		end
+	end
+	return rules
 end
 
 --------------------------------------------------------------------------
@@ -1030,7 +1065,7 @@ local function AttachScrollLine(scroll, parent)
 	return line
 end
 
-local NAV = { "general", "badges", "alerts", "sharing", "keybinds" }
+local NAV = { "general", "badges", "alerts", "sharing", "keybinds", "profile" }
 
 -- Blizzard's own Settings window is where people find the launcher page for this one
 -- (Esc > Options > AddOns). Like other addons' settings windows, ours closes it when it
@@ -1043,7 +1078,7 @@ local function CloseBlizzardSettings()
 end
 
 local function BuildWindow()
-	definePages()
+	if not pages then definePages() end
 	local saved = ns.DB().optionsPage
 	current = pageByKey[saved] and saved or "general"
 

@@ -37,6 +37,7 @@ sortable list window.
   - `/thumber config` — settings & keybinds.
   - `/thumber test` — preview the group-join alert.
   - `/thumber share` — export, import, or send your marks; `/thumber send <name>`.
+  - `/thumber profile` — export or import all your settings, positions and keybinds.
 - **In the window:** the marks list, with search and filters. Press **Manually Mark**
   to add someone by typing their name (or **Use target**), picking a mark, and
   optionally a note, then **Save mark**. Click any row to open the same dialog on
@@ -117,6 +118,7 @@ pointing at does. Blizzard's own controls throughout.
 | **Alerts** | The group alert, its sound, where it appears (unlock to drag), and a preview of the toast |
 | **Sharing** | Whether to accept offers, and the share window |
 | **Keybinds** | The four keys; click one and press a key, right-click clears |
+| **Profile** | Export or import every setting, position and keybind as one string |
 
 Blizzard's own Settings window (Esc → Options → AddOns → Thumber) carries a small
 page with a button that opens it.
@@ -148,6 +150,25 @@ Anything that comes in is checked first: invalid entries are dropped, colour and
 link codes are stripped from names and notes, and sizes are capped. To refuse
 offers entirely, untick **Let other players offer me their marks** in
 `/thumber config`.
+
+## Profile: move your whole setup
+
+`/thumber profile` (or **Profile** in the settings window) copies *everything* about how
+Thumber is set up into one string, `THUMBERPROFILE:1:...`:
+
+- every setting (badges, alert, sound, sharing, tooltips, chat),
+- where you put the **marks window**, the **alert**, and the **minimap button**,
+- the settings page you last had open, and
+- your four **keybinds** (they live in WoW's key bindings, not in Thumber's saved data, so
+  they are read and written through the game).
+
+Paste it on another character or another install and press **Check pasted profile**. It is
+validated first (the tags and version, then every value against what the settings window
+allows), you are told what it holds and how many entries were skipped, and nothing changes
+until you press **Apply profile**. Applying puts everything the profile covers back to the
+defaults and then sets what it contains, so the result is the same setup, and it all
+redraws on the spot: no reload. Keybinds are left alone if you are in combat (apply it
+again afterwards). Your **marks** are never touched; share those with **Share**.
 
 ## Data
 

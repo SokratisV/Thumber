@@ -286,6 +286,15 @@ local function RestorePos(frame)
 	return true
 end
 
+-- Move the marks window to the saved position (after a profile import), or back to the centre.
+function ns.ApplyWindowPos()
+	if not win then return end
+	if not RestorePos(win) then
+		win:ClearAllPoints()
+		win:SetPoint("CENTER")
+	end
+end
+
 local function HeaderIcon(parent, texture, tip, onClick, x)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(16, 16)
@@ -1218,6 +1227,8 @@ SlashCmdList.THUMBER = function(msg)
 		if Thumber_OpenSettings then Thumber_OpenSettings() end
 	elseif cmd == "share" or cmd == "export" or cmd == "import" then
 		if ns.OpenShare then ns.OpenShare() end
+	elseif cmd == "profile" then
+		if ns.OpenProfile then ns.OpenProfile() end
 	elseif cmd == "send" then
 		local ok, err = ns.SendMarks(rest)
 		Print(ok and ("offering your marks to " .. rest .. ".") or err)
@@ -1240,6 +1251,7 @@ SlashCmdList.THUMBER = function(msg)
 		Print("  /thumber resetbinds — re-apply the arrow-key defaults")
 		Print("  /thumber test — preview the group-join alert")
 		Print("  /thumber share — export, import, or send your marks")
+		Print("  /thumber profile — export or import all your settings, positions and keybinds")
 		Print("  /thumber send <player> — offer your marks to a player")
 	end
 end

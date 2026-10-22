@@ -12,6 +12,7 @@ embeds.xml
 Thumber.lua
 Extras.lua
 Share.lua
+Profile.lua
 Options.lua
 Settings.lua
 # Bindings.xml is intentionally NOT listed here — the client auto-loads it from
